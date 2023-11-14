@@ -25,12 +25,12 @@ def round_up(f, s):
 grid_size = (round_up(boundary[0], 1), round_up(boundary[1], 1), round_up(boundary[2], 1))
 
 dim = 3
-bg_color = 0x112F41
-particle_color = 0x068587
+bg_color = (1/255,47/255,65/255)
+particle_color = (6/255,133/255,135/255)
 boundary_color = 0xEBACA2
 num_particles_x = 10
 num_particles_y = 10
-num_particles_z = 10
+num_particles_z = 20
 num_particles = num_particles_x * num_particles_y * num_particles_z
 max_num_particles_per_cell = 100
 max_num_neighbors = 100
@@ -265,7 +265,7 @@ def run_pbf():
 points_pos = ti.Vector.field(3, dtype=ti.f32, shape = 8)
 def render(window, scene, canvas):
     
-    scene.particles(positions, color = (1, 1, 1), radius = 0.1)
+    scene.particles(positions, color = particle_color, radius = 0.1)
 
     b = board_states[None]
     points_pos[0] = [b[0], -1, 0]
@@ -326,6 +326,7 @@ def main():
     print(f"boundary={boundary} grid={grid_size} cell_size={cell_size}")
     window = ti.ui.Window("Test for Drawing 3d-lines", screen_res)
     canvas = window.get_canvas()
+    canvas.set_background_color(bg_color)
     scene = ti.ui.Scene()
     camera = ti.ui.Camera()
     scene.point_light(pos=(1, 2, 3), color=(1, 1, 1))

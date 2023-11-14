@@ -5,13 +5,14 @@ import numpy as np
 import taichi as ti
 
 ti.init(arch=ti.gpu)
-
+k = 2
 screen_res = (800, 400)
+grid_res = (300, 300, 100)
 screen_to_world_ratio = 10.0
 boundary = (
-    screen_res[0] / screen_to_world_ratio, # x 80
-    screen_res[1] / screen_to_world_ratio, # y 40
-    screen_res[1] / screen_to_world_ratio, # z 40
+    grid_res[0] / screen_to_world_ratio * k,
+    grid_res[1] / screen_to_world_ratio * k,
+    grid_res[2] / screen_to_world_ratio * k,
 )
 cell_size = 2.51
 cell_recpr = 1.0 / cell_size
@@ -21,18 +22,19 @@ def round_up(f, s):
     return (math.floor(f * cell_recpr / s) + 1) * s
 
 
-grid_size = (round_up(boundary[0], 1), round_up(boundary[1], 1), round_up(boundary[1], 1))
+grid_size = (round_up(boundary[0], 1), round_up(boundary[1], 1), round_up(boundary[2], 1))
 
 dim = 3 # 3d
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
 boundary_color = 0xEBACA2
-num_particles_x = 60
-num_particles_z = 60
-num_particles = num_particles_x * num_particles_z * 20
+num_particles_x = 10 * k
+num_particles_y = 10 * k
+num_particles_z = 10 * k
+num_particles = num_particles_x * num_particles_y * num_particles_z
 max_num_particles_per_cell = 100 # 3d
 max_num_neighbors = 100 # 3d
-time_delta = 1.0 / 20.0
+time_delta = 1.0 / 60.0
 epsilon = 1e-5
 particle_radius = 3.0
 particle_radius_in_world = particle_radius / screen_to_world_ratio
@@ -88,7 +90,7 @@ def poly6_value(s, h):
 
 @ti.func
 def spiky_gradient(r, h):
-    result = ti.Vector([0.0, 0.0])
+    result = ti.Vector([0.0, 0.0, 0.0])
     r_len = r.norm()
     if 0 < r_len and r_len < h:
         x = (h - r_len) / (h * h * h)
@@ -115,19 +117,19 @@ def get_cell(pos):
 @ti.func
 def is_in_grid(c):
     # @c: Vector(i32)
-    return 0 <= c[0] and c[0] < grid_size[0] and 0 <= c[1] and c[1] < grid_size[1]
+    return 0 <= c[0] and c[0] < grid_size[0] and 0 <= c[1] and c[1] < grid_size[1] and 0 <= c[2] and c[2] < grid_size[2]
 
 
 @ti.func
 def confine_position_to_boundary(p):
     bmin = particle_radius_in_world
-    # bmax = ti.Vector([board_states[None][0], boundary[1], boundary[2]]) - particle_radius_in_world
-    # for i in ti.static([0,2]):
-    #     # Use randomness to prevent particles from sticking into each other after clamping
-    #     if p[i] <= bmin:
-    #         p[i] = bmin + epsilon * ti.random()
-    #     elif bmax[i] <= p[i]:
-    #         p[i] = bmax[i] - epsilon * ti.random()
+    bmax = ti.Vector([board_states[None][0], boundary[1], boundary[2]]) - particle_radius_in_world
+    for i in ti.static(range(dim)):
+        # Use randomness to prevent particles from sticking into each other after clamping
+        if p[i] <= bmin:
+            p[i] = bmin + epsilon * ti.random()
+        elif bmax[i] <= p[i]:
+            p[i] = bmax[i] - epsilon * ti.random()
     return p
 
 
@@ -136,8 +138,8 @@ def move_board():
     # probably more accurate to exert force on particles according to hooke's law.
     b = board_states[None]
     b[1] += 1.0
-    period = 90
-    vel_strength = 8.0
+    period = 180
+    vel_strength = 8.0 + 2*k
     if b[1] >= 2 * period:
         b[1] = 0
     b[0] += -ti.sin(b[1] * np.pi / period) * vel_strength * time_delta
@@ -193,7 +195,7 @@ def substep():
     for p_i in positions:
         pos_i = positions[p_i]
 
-        grad_i = ti.Vector([0.0, 0.0])
+        grad_i = ti.Vector([0.0, 0.0, 0.0])
         sum_gradient_sqr = 0.0
         density_constraint = 0.0
 
@@ -219,7 +221,7 @@ def substep():
         pos_i = positions[p_i]
         lambda_i = lambdas[p_i]
 
-        pos_delta_i = ti.Vector([0.0, 0.0])
+        pos_delta_i = ti.Vector([0.0, 0.0, 0.0])
         for j in range(particle_num_neighbors[p_i]):
             p_j = particle_neighbors[p_i, j]
             if p_j < 0:
@@ -254,7 +256,6 @@ def run_pbf():
         substep()
     epilogue()
 
-
 # y  z 
 # | / -> num_particles_z
 # |/
@@ -268,7 +269,7 @@ def init_particles():
         z = (i % (num_particles_x*num_particles_z)) // num_particles_x
         delta = h_ * 0.8
         offs = ti.Vector([(boundary[0] - delta * num_particles_x) * 0.5, boundary[1] * 0.02, boundary[2] * 0.02])
-        positions[i] = ti.Vector([x, y, z]) * delta + offs
+        positions[i] = ti.Vector([x, z, y]) * delta + offs
         for c in ti.static(range(dim)):
             velocities[i][c] = (ti.random() - 0.5) * 4
     board_states[None] = ti.Vector([boundary[0] - epsilon, -0.0])
@@ -286,20 +287,19 @@ def print_stats():
 def render(window, scene, canvas, camera):
     camera.track_user_inputs(window, movement_speed=0.03, hold_key=ti.ui.RMB)
 
-    scene.particles(positions, color = (1, 1, 1), radius = 0.1)
-
     b = board_states[None]
-    points_pos[0] = [b[0], 0, 0]
-    points_pos[1] = [b[0], 0, 40]
+    board_len = 10 * k
+    points_pos[0] = [b[0], -1, 0]
+    points_pos[1] = [b[0], -1, board_len]
 
-    points_pos[2] = [b[0], 0, 0]
-    points_pos[3] = [b[0], 40, 0]
+    points_pos[2] = [b[0], -1, 0]
+    points_pos[3] = [b[0], 18, 0]
 
-    points_pos[4] = [b[0], 40, 0]
-    points_pos[5] = [b[0], 40, 40]
+    points_pos[4] = [b[0], 18, 0]
+    points_pos[5] = [b[0], 18, board_len]
 
-    points_pos[6] = [b[0], 40, 40]
-    points_pos[7] = [b[0], 0, 40]
+    points_pos[6] = [b[0], 18, board_len]
+    points_pos[7] = [b[0], -1, board_len]
     
     scene.lines(points_pos, color = (0.28, 0.68, 0.99), width = 10.0)
     scene.particles(positions, color = particle_color, radius = 0.1)
@@ -318,8 +318,8 @@ def main():
 
     scene.point_light(pos=(1, 2, 3), color=(1,1,1))
     scene.ambient_light((0.8, 0.8, 0.8))
-    camera.position(boundary[0]/2, boundary[1]/2, -100)
-    camera.lookat(boundary[0]/2, boundary[1]/2, 0)
+    camera.position(boundary[0]/2, boundary[1]/2, 40 * k)
+    camera.lookat(boundary[0]/2, boundary[1]/4, 0)
     camera.up(0, 1, 0)
     camera.projection_mode(ti.ui.ProjectionMode.Perspective)
 
@@ -328,10 +328,7 @@ def main():
     frame = 0
     while window.running:
         move_board()
-        # prologue()
-        # run_pbf()
-        if frame % 20 == 1:
-            print_stats()
+        run_pbf()
 
         # rendering
         render(window, scene, canvas, camera)
