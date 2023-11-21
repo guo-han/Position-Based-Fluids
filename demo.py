@@ -272,9 +272,9 @@ def epilogue():
             if p_j < 0:
                 break
             pos_ji = pos_i - positions[p_j]
-            eta += mass * omegas[j].norm() * (spiky_gradient(pos_ji, h_))
+            eta += mass * omegas[j].norm() * spiky_gradient(pos_ji, h_) / rho0
         location_vector = eta / (epsilon + eta.norm())
-        vorticity_forces[i] += 0.5 * (location_vector.cross(omegas[i]))
+        vorticity_forces[i] += 3 * (location_vector.cross(omegas[i]))
 
     # apply vorticity force
     for i in positions:
@@ -293,7 +293,6 @@ def epilogue():
     
     for i in positions:
         velocities[i] += 0.01 * velocities_deltas[i]
-    # no vorticity/xsph because we cannot do cross product in 2D...
 
 
 def run_pbf():
