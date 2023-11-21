@@ -342,7 +342,7 @@ def main():
     # gui = ti.GUI("PBF2D", screen_res)
     # while gui.running and not gui.get_event(gui.ESCAPE):
         move_board()
-        run_pbf()
+        # run_pbf()
     #     if gui.frame % 20 == 1:
     #         print_stats()
         render(window, scene, canvas)
