@@ -57,6 +57,9 @@ spiky_grad_factor = -45.0 / math.pi
 old_positions = ti.Vector.field(dim, float)
 positions = ti.Vector.field(dim, float)
 velocities = ti.Vector.field(dim, float)
+omegas = ti.Vector.field(dim, float)
+vorticity_forces = ti.Vector.field(dim, float)
+velocities_deltas = ti.Vector.field(dim, float)
 grid_num_particles = ti.field(int)
 grid2particles = ti.field(int)
 particle_num_neighbors = ti.field(int)
@@ -66,14 +69,14 @@ position_deltas = ti.Vector.field(dim, float)
 # 0: x-pos, 1: timestep in sin()
 board_states = ti.Vector.field(2, float)
 
-ti.root.dense(ti.i, num_particles).place(old_positions, positions, velocities)
+ti.root.dense(ti.i, num_particles).place(old_positions, positions, velocities, omegas, vorticity_forces)
 grid_snode = ti.root.dense(ti.ijk, grid_size)
 grid_snode.place(grid_num_particles)
 grid_snode.dense(ti.l, max_num_particles_per_cell).place(grid2particles)
 nb_node = ti.root.dense(ti.i, num_particles)
 nb_node.place(particle_num_neighbors)
 nb_node.dense(ti.j, max_num_neighbors).place(particle_neighbors)
-ti.root.dense(ti.i, num_particles).place(lambdas, position_deltas)
+ti.root.dense(ti.i, num_particles).place(lambdas, position_deltas, velocities_deltas)
 ti.root.place(board_states)
 
 # boarder corners
@@ -247,6 +250,49 @@ def epilogue():
     # update velocities
     for i in positions:
         velocities[i] = (positions[i] - old_positions[i]) / time_delta
+
+    # calculate vorticity
+    for i in positions:
+        pos_i = positions[i]
+        omegas[i] = 0.0
+        for j in range(particle_num_neighbors[i]):
+            p_j = particle_neighbors[i, j]
+            if p_j < 0:
+                break
+            pos_ji = pos_i - positions[p_j]
+            omegas[i] += mass * (velocities[p_j] - velocities[i]).cross(spiky_gradient(pos_ji, h_))
+
+    # calculate vorticity force
+    for i in positions:
+        pos_i = positions[i]
+        eta = pos_i * 0.0
+        vorticity_forces[i] = 0.0
+        for j in range(particle_num_neighbors[i]):
+            p_j = particle_neighbors[i, j]
+            if p_j < 0:
+                break
+            pos_ji = pos_i - positions[p_j]
+            eta += mass * omegas[j].norm() * (spiky_gradient(pos_ji, h_))
+        location_vector = eta / (epsilon + eta.norm())
+        vorticity_forces[i] += 0.5 * (location_vector.cross(omegas[i]))
+
+    # apply vorticity force
+    for i in positions:
+        velocities[i] += (vorticity_forces[i] / mass) * time_delta
+
+    # add viscosity
+    for i in positions:
+        pos_i = positions[i]
+        velocities_deltas[i] = 0.0
+        for j in range(particle_num_neighbors[i]):
+            p_j = particle_neighbors[i, j]
+            if p_j < 0:
+                break
+            pos_ji = pos_i - positions[p_j]
+            velocities_deltas[i] += mass * (velocities[p_j] - velocities[i]) * poly6_value(pos_ji.norm(), h_)
+    
+    for i in positions:
+        velocities[i] += 0.01 * velocities_deltas[i]
     # no vorticity/xsph because we cannot do cross product in 2D...
 
 
@@ -283,6 +329,7 @@ def print_stats():
     num = particle_num_neighbors.to_numpy()
     avg, max_ = np.mean(num), np.max(num)
     print(f"  #neighbors per particle: avg={avg:.2f} max={max_}")
+    print("Vorticity force of particle 0: {}".format(vorticity_forces[0]))
 
 def render(window, scene, canvas, camera):
     camera.track_user_inputs(window, movement_speed=0.03, hold_key=ti.ui.RMB)
@@ -331,7 +378,7 @@ def main():
             if window.event.key in [ti.ui.ESCAPE]: break
         move_board()
         run_pbf()
-
+        print_stats()
         # rendering
         render(window, scene, canvas, camera)
         frame += 1
