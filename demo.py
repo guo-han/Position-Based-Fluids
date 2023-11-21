@@ -7,7 +7,7 @@ import taichi as ti
 ti.init(arch=ti.gpu)
 k = 2
 screen_res = (800, 400)
-grid_res = (300, 300, 100)
+grid_res = (300, 100, 100)
 screen_to_world_ratio = 10.0
 boundary = (
     grid_res[0] / screen_to_world_ratio * k,
@@ -327,6 +327,8 @@ def main():
 
     frame = 0
     while window.running:
+        if window.get_event(ti.ui.PRESS):
+            if window.event.key in [ti.ui.ESCAPE]: break
         move_board()
         run_pbf()
 
