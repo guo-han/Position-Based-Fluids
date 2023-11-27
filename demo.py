@@ -5,9 +5,9 @@ import numpy as np
 import taichi as ti
 
 ti.init(arch=ti.gpu)
-k = 2
+k = 3
 screen_res = (800, 400)
-grid_res = (300, 100, 100)
+grid_res = (300, 200, 100)
 screen_to_world_ratio = 10.0
 boundary = (
     grid_res[0] / screen_to_world_ratio * k,
@@ -45,8 +45,8 @@ mass = 1.0
 rho0 = 1.0
 lambda_epsilon = 100.0
 pbf_num_iters = 5
-corr_deltaQ_coeff = 0.3
-corrK = 0.001
+corr_deltaQ_coeff = 0.2
+corrK = 0.01
 # Need ti.pow()
 # corrN = 4.0
 neighbor_radius = h_ * 1.05
@@ -60,6 +60,7 @@ velocities = ti.Vector.field(dim, float)
 omegas = ti.Vector.field(dim, float)
 vorticity_forces = ti.Vector.field(dim, float)
 velocities_deltas = ti.Vector.field(dim, float)
+density = ti.field(float)
 grid_num_particles = ti.field(int)
 grid2particles = ti.field(int)
 particle_num_neighbors = ti.field(int)
@@ -69,7 +70,7 @@ position_deltas = ti.Vector.field(dim, float)
 # 0: x-pos, 1: timestep in sin()
 board_states = ti.Vector.field(2, float)
 
-ti.root.dense(ti.i, num_particles).place(old_positions, positions, velocities, omegas, vorticity_forces)
+ti.root.dense(ti.i, num_particles).place(old_positions, positions, velocities, omegas, vorticity_forces, density)
 grid_snode = ti.root.dense(ti.ijk, grid_size)
 grid_snode.place(grid_num_particles)
 grid_snode.dense(ti.l, max_num_particles_per_cell).place(grid2particles)
@@ -135,13 +136,31 @@ def confine_position_to_boundary(p):
             p[i] = bmax[i] - epsilon * ti.random()
     return p
 
+@ti.func
+def compute_density():
+    for p_i in positions:
+        pos_i = positions[p_i]
+        density_constraint = 0.0
+
+        for j in range(particle_num_neighbors[p_i]):
+            p_j = particle_neighbors[p_i, j]
+            if p_j < 0:
+                break
+            pos_ji = pos_i - positions[p_j]
+            # Eq(2)
+            density_constraint += poly6_value(pos_ji.norm(), h_)  # mass in Eq(2) is moved to Eq(1)
+
+        # Eq(1)
+        density_constraint += poly6_value(0, h_)  # self contribution
+        density[p_i] = density_constraint * mass
+
 
 @ti.kernel
 def move_board():
     # probably more accurate to exert force on particles according to hooke's law.
     b = board_states[None]
     b[1] += 1.0
-    period = 180
+    period = 250
     vel_strength = 8.0 + 2*k
     if b[1] >= 2 * period:
         b[1] = 0
@@ -251,6 +270,9 @@ def epilogue():
     for i in positions:
         velocities[i] = (positions[i] - old_positions[i]) / time_delta
 
+    # calculate density first
+    compute_density()
+
     # calculate vorticity
     for i in positions:
         pos_i = positions[i]
@@ -260,8 +282,7 @@ def epilogue():
             if p_j < 0:
                 break
             pos_ji = pos_i - positions[p_j]
-            omegas[i] += mass * (velocities[p_j] - velocities[i]).cross(spiky_gradient(pos_ji, h_))
-
+            omegas[i] += mass * (velocities[p_j] - velocities[i]).cross(spiky_gradient(pos_ji, h_)) / (epsilon + density[p_j])
     # calculate vorticity force
     for i in positions:
         pos_i = positions[i]
@@ -272,9 +293,9 @@ def epilogue():
             if p_j < 0:
                 break
             pos_ji = pos_i - positions[p_j]
-            eta += mass * omegas[j].norm() * spiky_gradient(pos_ji, h_) / rho0
+            eta += mass * omegas[j].norm() * spiky_gradient(pos_ji, h_) / (epsilon + density[p_j])
         location_vector = eta / (epsilon + eta.norm())
-        vorticity_forces[i] += 3 * (location_vector.cross(omegas[i]))
+        vorticity_forces[i] += 0.5 * (location_vector.cross(omegas[i]))
 
     # apply vorticity force
     for i in positions:
@@ -289,10 +310,10 @@ def epilogue():
             if p_j < 0:
                 break
             pos_ji = pos_i - positions[p_j]
-            velocities_deltas[i] += mass * (velocities[p_j] - velocities[i]) * poly6_value(pos_ji.norm(), h_)
+            velocities_deltas[i] += mass * (velocities[p_j] - velocities[i]) * poly6_value(pos_ji.norm(), h_) / (epsilon + density[p_j])
     
     for i in positions:
-        velocities[i] += 0.01 * velocities_deltas[i]
+        velocities[i] += 0.1 * velocities_deltas[i]
 
 
 def run_pbf():
@@ -372,12 +393,15 @@ def main():
     print(f"boundary={boundary} grid={grid_size} cell_size={cell_size}")
 
     frame = 0
+    start = False
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break
-        move_board()
-        run_pbf()
-        print_stats()
+            if window.event.key in [ti.ui.SPACE]: start = not start
+        if start:
+            move_board()
+            run_pbf()
+            print_stats()
         # rendering
         render(window, scene, canvas, camera)
         frame += 1
