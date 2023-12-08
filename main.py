@@ -1,7 +1,10 @@
+import os
 import math
 import numpy as np
 import taichi as ti
 from PBF import Pbf
+from FOAM import Foam
+from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line
 
 # scale factor
 k = 3 
@@ -15,7 +18,7 @@ points_pos = ti.Vector.field(3, dtype=ti.f32, shape = 8) # boarder corners
 
 # init objects
 fluid = Pbf(k)
-# foam = Foam()
+foam = Foam(fluid)
 # rigid = RigidBody()
 
 def render(window, scene, canvas, camera):
@@ -45,12 +48,25 @@ def render(window, scene, canvas, camera):
 def print_stats():
     print("PBF stats:")
     num = fluid.grid_num_particles.to_numpy()
+    print(f" #Total particles: {fluid.positions.shape[0]}")
     avg, max_ = np.mean(num), np.max(num)
     print(f"  #particles per cell: avg={avg:.2f} max={max_}")
     num = fluid.particle_num_neighbors.to_numpy()
     avg, max_ = np.mean(num), np.max(num)
     print(f"  #neighbors per particle: avg={avg:.2f} max={max_}")
     print("Vorticity force of particle 0: {}".format(fluid.vorticity_forces[0]))
+
+def bake(frame, bake_foam=False, start=150, end=160):
+    if frame >= start and frame < end:
+        print(f"Baking frame {frame-start+1}/{end-start}")
+        filename = f"frame_{frame:05d}"
+        pos_np = fluid.positions.to_numpy()
+        # pos_np = pos_np[:, (0, 2, 1)] # why???
+        convert_particle_info_to_json(pos_np, filename)
+        convert_json_to_mesh_command_line(filename)
+
+        if bake_foam:
+            foam.estimate_norm(filename)
 
 def run():
     fluid.move_board()
@@ -76,12 +92,15 @@ def main():
 
     frame = 0
     start = True
+    bake_mesh = True
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break
             if window.event.key in [ti.ui.SPACE]: start = not start
         if start:
             run()
+        if bake_mesh:
+            bake(frame, bake_foam=True)
         # rendering
         render(window, scene, canvas, camera)
         frame += 1
