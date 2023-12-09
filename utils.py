@@ -1,15 +1,16 @@
 import os
 import subprocess
 import numpy as np
+import taichi as ti
 import json
 
 PROJ_PATH = os.path.dirname(os.path.realpath(__file__))
 PARTICLE_dir = "particles"
 RIGID_dir = "rigids"
 MESH_dir = "meshes"
-os.makedirs(os.path.join(PROJ_PATH, PARTICLE_dir),exist_ok=True)
-os.makedirs(os.path.join(PROJ_PATH, RIGID_dir),exist_ok=True)
-os.makedirs(os.path.join(PROJ_PATH, MESH_dir),exist_ok=True)
+os.makedirs(os.path.join(PROJ_PATH, PARTICLE_dir), exist_ok=True)
+os.makedirs(os.path.join(PROJ_PATH, RIGID_dir), exist_ok=True)
+os.makedirs(os.path.join(PROJ_PATH, MESH_dir), exist_ok=True)
 
 def convert_json_to_mesh_command_line(filename, 
                                       particle_radius=0.8,
@@ -44,6 +45,7 @@ def write_obj(vertices, faces, filename):
 def read_obj(filename):
     # Read the OBJ file and store vertices and faces in a dictionary
     vertices = []
+    normals = []
     faces = []
     
     with open(filename, 'r') as f:
@@ -55,11 +57,16 @@ def read_obj(filename):
             if parts[0] == 'v':
                 vertex = tuple(map(float, parts[1:]))
                 vertices.append(vertex)
+            elif parts[0] == 'vn':
+                normal = tuple(map(float, parts[1:]))
+                normals.append(normal)
             elif parts[0] == 'f':
                 face = tuple(map(int, [p.split('/')[0] for p in parts[1:]]))
                 faces.append(face)
 
     vertices = np.array(vertices)
+    normals = np.array(normals)
     faces = np.array(faces) - 1
-    obj_data = {'vertices': vertices, 'faces': faces}
+    obj_data = {'vertices': vertices, 'normals': normals, 'faces': faces}
     return obj_data
+

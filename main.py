@@ -7,12 +7,13 @@ from FOAM import Foam
 from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line
 
 # scale factor
-k = 3 
+k = 3
 # config rendering
 ti.init(arch=ti.gpu)
 screen_res = (800, 400)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
+foam_color = (1,1,1)
 boundary_color = 0xEBACA2
 points_pos = ti.Vector.field(3, dtype=ti.f32, shape = 8) # boarder corners
 
@@ -40,6 +41,7 @@ def render(window, scene, canvas, camera):
     
     scene.lines(points_pos, color = (0.28, 0.68, 0.99), width = 10.0)
     scene.particles(fluid.positions, color = particle_color, radius = 0.1)
+    scene.particles(foam.foam_positions, color = foam_color, radius = 0.1)
     scene.set_camera(camera)
 
     canvas.scene(scene)
@@ -56,7 +58,7 @@ def print_stats():
     print(f"  #neighbors per particle: avg={avg:.2f} max={max_}")
     print("Vorticity force of particle 0: {}".format(fluid.vorticity_forces[0]))
 
-def bake(frame, bake_foam=False, start=150, end=160):
+def bake(frame, start=150, end=160):
     if frame >= start and frame < end:
         print(f"Baking frame {frame-start+1}/{end-start}")
         filename = f"frame_{frame:05d}"
@@ -65,13 +67,11 @@ def bake(frame, bake_foam=False, start=150, end=160):
         convert_particle_info_to_json(pos_np, filename)
         convert_json_to_mesh_command_line(filename)
 
-        if bake_foam:
-            foam.estimate_norm(filename)
-
 def run():
     fluid.move_board()
     fluid.run_pbf()
-    print_stats()
+    foam.run()
+    # print_stats()
 
 def main():
     fluid.init_particles()
@@ -92,7 +92,7 @@ def main():
 
     frame = 0
     start = True
-    bake_mesh = True
+    bake_mesh = False
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break
@@ -104,7 +104,6 @@ def main():
         # rendering
         render(window, scene, canvas, camera)
         frame += 1
-
 
 if __name__ == "__main__":
     main()
