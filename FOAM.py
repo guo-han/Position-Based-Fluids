@@ -192,36 +192,32 @@ class Foam():
             I_wc = clamp(self.curvature[idx], self.wcMin[None], self.wcMax[None])
             I_ke = clamp(self.energy[idx], self.keMin[None], self.keMax[None])
             num = int(max(self.foam_scale * I_ke * (self.k_ta*I_ta + self.k_wc*I_wc) * self.timeStepSize + 0.5, 0.0))
-            if num > 300: 
-                self.foam_positions.append(self.positions[idx])
-                self.foam_lifetime.append(0.)
-
             # nt = int(self.foam_scale * I_ke * self.k_ta * I_ta * self.timeStepSize + 0.5)
             # nw = int(self.foam_scale * I_ke * self.k_wc * I_wc * self.timeStepSize + 0.5)
 
-            p = self.positions[idx]
-            v = self.velocities[idx]
-            vn = v.normalized()
-            e1, e2 = self.getOrthogonalVectors(vn)
+            if num > 300: 
+                p = self.positions[idx]
+                v = self.velocities[idx]
+                vn = v.normalized()
+                e1, e2 = self.getOrthogonalVectors(vn)
 
-            e1 *= self.h_
-            e2 *= self.h_
+                e1 *= self.h_
+                e2 *= self.h_
 
-            for i in range(num):
-                Xr, Xt, Xh = ti.random(float), ti.random(float), ti.random(float)
-                r = self.h_ * ti.sqrt(Xr)
-                theta = 2*math.pi*Xt
-                h = self.timeStepSize * (Xh - 0.5) * v.norm()
+                for i in range(10):
+                    Xr, Xt, Xh = ti.random(float), ti.random(float), ti.random(float)
+                    r = self.h_ * ti.sqrt(Xr)
+                    theta = 2*math.pi*Xt
+                    h = self.timeStepSize * (Xh - 0.5) * v.norm()
 
-                xd = p + r*ti.cos(theta)*e1 + r*ti.sin(theta)*e2 + h*vn
-                vd = r*ti.cos(theta)*e1 + r*ti.sin(theta)*e2 + v
-                life = self.lifetimeMin + I_ke / self.keMax[None] * ti.random(float) * (self.lifetimeMax-self.lifetimeMin)
+                    xd = p + r*ti.cos(theta)*e1 + r*ti.sin(theta)*e2 + h*vn
+                    vd = r*ti.cos(theta)*e1 + r*ti.sin(theta)*e2 + v
+                    life = self.lifetimeMin + I_ke / self.keMax[None] * ti.random(float) * (self.lifetimeMax-self.lifetimeMin)
 
-                # self.foam_positions.append(xd)
-                # self.foam_velocities.append(vd)
-                # self.foam_lifetime.append(life)
-                # self.foam_type.append(0)
-                break
+                    self.foam_positions.append(xd)
+                    # self.foam_velocities.append(vd)
+                    # self.foam_lifetime.append(life)
+                    # self.foam_type.append(0)
 
     @ti.kernel
     def removeParticles(self,):
@@ -238,6 +234,7 @@ class Foam():
                 self.tmp_lifetime.append(self.foam_lifetime[p_i])
                 # self.foam_type[p_i-removed] = self.foam_type[p_i]
                 # self.foam_counter[None] -= removed
+                
         
         # deactivate
         self.foam_positions.deactivate()
