@@ -9,7 +9,8 @@ from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh
 # scale factor
 k = 3
 # config rendering
-ti.init(arch=ti.gpu)
+# ti.init(arch=ti.gpu)
+ti.init()
 screen_res = (800, 400)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)

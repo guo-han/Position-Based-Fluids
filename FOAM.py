@@ -13,6 +13,7 @@ def clamp(x, tmin, tmax):
 @ti.data_oriented
 class Foam():
     def __init__(self, fluid) -> None:
+        self.fluid = fluid
         self.dim = fluid.dim
         self.h_ = fluid.h_
         self.rho0 = fluid.rho0
@@ -27,17 +28,21 @@ class Foam():
         
         # foam
         h3 = pow(self.h_, 3)
+        self.g = fluid.g
         self.m_k = 8.0 / (math.pi * h3)
         self.m_l = 48.0 / (math.pi * h3)
         self.foam_scale = 1
         self.timeStepSize = fluid.time_delta
         self.k_ta = 4000
         self.k_wc = 100000
+        self.k_buoyancy = 2.0
+        self.k_drag = 0.8
         self.lifetimeMin = 2.0
         self.lifetimeMax = 5.0
-        max_num_white_particles = 3000
+        self.max_num_white_particles = 30000
         self.densities = ti.field(float)
         self.normals = ti.Vector.field(self.dim, float)
+        ti.root.dense(ti.i, num_particles).place(self.densities, self.normals)
 
         self.foam_positions = ti.Vector.field(self.dim, float)
         self.foam_velocities = ti.Vector.field(self.dim, float)
@@ -46,27 +51,34 @@ class Foam():
         self.tmp_positions = ti.Vector.field(self.dim, float)
         self.tmp_velocities = ti.Vector.field(self.dim, float)
         self.tmp_lifetime = ti.field(float)
-        self.tmp_type = ti.field(int)
         #  ###############
-        #  foam_type: 0 -> spray, 1 -> foam, 2 -> bubble
+        #  foam_type: spray -> 0, foam -> 1, bubbles -> 2
         #  ###############
+        ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_positions)
+        ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_velocities)
+        ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_lifetime)
+        ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_type)
+        ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.tmp_positions)
+        ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.tmp_velocities)
+        ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.tmp_lifetime)
 
         # potentials
         self.v_diff = ti.field(float)
         self.curvature = ti.field(float)
         self.energy = ti.field(float)
-
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.foam_positions)
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.foam_velocities)
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.foam_lifetime)
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.foam_type)
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.tmp_positions)
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.tmp_velocities)
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.tmp_lifetime)
-        ti.root.dynamic(ti.i, max_num_white_particles, chunk_size=32).place(self.tmp_type)
-        ti.root.dense(ti.i, num_particles).place(self.densities, self.normals)
         ti.root.dense(ti.i, num_particles).place(self.v_diff, self.curvature, self.energy)
 
+        # neighbors
+        self.neighbor_radius = fluid.neighbor_radius
+        self.max_num_neighbors = fluid.max_num_neighbors
+        self.grid_num_particles = fluid.grid_num_particles
+        self.grid2particles = fluid.grid2particles
+        self.foam_num_neighbors = ti.field(int)
+        self.foam_neighbors = ti.field(int)
+
+        nb_node = ti.root.dense(ti.i, self.max_num_white_particles)
+        nb_node.place(self.foam_num_neighbors)
+        nb_node.dense(ti.j, self.max_num_neighbors).place(self.foam_neighbors)
 
         # accumulate values
         self.frame_num = ti.field(ti.i32, shape=())
@@ -79,7 +91,7 @@ class Foam():
         self.wcMin = ti.field(ti.f32, shape=())
         self.keMax = ti.field(ti.f32, shape=())
         self.keMin = ti.field(ti.f32, shape=())
-        self.foam_counter = ti.field(ti.i32, shape=())
+        self.foam_counter = ti.field(ti.i32, shape=()) # total foam
 
     @ti.func
     def cubic_W(self, r: ti.f32):
@@ -120,9 +132,9 @@ class Foam():
                 if p_j < 0:
                     break
                 pos_ji = pos_i - self.positions[p_j]
-                density_acc += self.mass * self.cubic_W(pos_ji.norm())
+                density_acc += self.cubic_W(pos_ji.norm())
 
-            self.densities[p_i] = density_acc
+            self.densities[p_i] = self.mass * density_acc
             
     @ti.kernel
     def compute_normal(self, ):
@@ -181,12 +193,14 @@ class Foam():
         if ((tmp.dot(vec)) > 1-self.epsilon):
             tmp = ti.Vector([0., 1., 0.])
 
-        e1 = (vec.cross(tmp)).normalized() 
-        e2 = (vec.cross(e1)).normalized()
+        e1 = vec.cross(tmp)
+        e2 = vec.cross(e1)
+        e1 = e1.normalized() if e1.norm() > self.epsilon else e1
+        e2 = e2.normalized() if e2.norm() > self.epsilon else e2
         return e1, e2
 
     @ti.kernel
-    def generateFoamParticles(self,):
+    def generateFoam(self,):
         for idx in self.positions:
             I_ta = clamp(self.v_diff[idx], self.taMin[None], self.taMax[None])
             I_wc = clamp(self.curvature[idx], self.wcMin[None], self.wcMax[None])
@@ -195,16 +209,18 @@ class Foam():
             # nt = int(self.foam_scale * I_ke * self.k_ta * I_ta * self.timeStepSize + 0.5)
             # nw = int(self.foam_scale * I_ke * self.k_wc * I_wc * self.timeStepSize + 0.5)
 
-            if num > 300: 
+            if num > 250: 
                 p = self.positions[idx]
                 v = self.velocities[idx]
-                vn = v.normalized()
+                vn = v.normalized() if v.norm() > self.epsilon else v
                 e1, e2 = self.getOrthogonalVectors(vn)
 
                 e1 *= self.h_
                 e2 *= self.h_
 
-                for i in range(10):
+                for i in range(15):
+                    if int(self.foam_counter[None]) >= self.max_num_white_particles: continue
+
                     Xr, Xt, Xh = ti.random(float), ti.random(float), ti.random(float)
                     r = self.h_ * ti.sqrt(Xr)
                     theta = 2*math.pi*Xt
@@ -214,39 +230,40 @@ class Foam():
                     vd = r*ti.cos(theta)*e1 + r*ti.sin(theta)*e2 + v
                     life = self.lifetimeMin + I_ke / self.keMax[None] * ti.random(float) * (self.lifetimeMax-self.lifetimeMin)
 
-                    self.foam_positions.append(xd)
-                    # self.foam_velocities.append(vd)
-                    # self.foam_lifetime.append(life)
+                    self.foam_positions[self.foam_counter[None]] = xd
+                    self.foam_velocities[self.foam_counter[None]] = vd
+                    self.foam_lifetime[self.foam_counter[None]] = life
                     # self.foam_type.append(0)
+                    ti.atomic_add(self.foam_counter[None], 1)
+
 
     @ti.kernel
-    def removeParticles(self,):
-        # deactivate
-        self.tmp_positions.deactivate()
-        self.tmp_velocities.deactivate()
-        self.tmp_lifetime.deactivate()
-
-        # filter new value 
-        for p_i in self.foam_lifetime:
+    def removeFoam(self,):
+        # filter lifetime value
+        total = int(self.foam_counter[None])
+        self.foam_counter[None] = 0
+        for p_i in range(total):
+            self.foam_lifetime[p_i] -= self.timeStepSize
             if (self.foam_lifetime[p_i] > self.epsilon):
-                self.tmp_positions.append(self.foam_positions[p_i])
-                self.tmp_velocities.append(self.foam_velocities[p_i])
-                self.tmp_lifetime.append(self.foam_lifetime[p_i])
-                # self.foam_type[p_i-removed] = self.foam_type[p_i]
-                # self.foam_counter[None] -= removed
-                
-        
-        # deactivate
-        self.foam_positions.deactivate()
-        self.foam_velocities.deactivate()
-        self.foam_lifetime.deactivate()
+                self.tmp_positions[self.foam_counter[None]] = self.foam_positions[p_i]
+                self.tmp_velocities[self.foam_counter[None]] = self.foam_velocities[p_i]
+                self.tmp_lifetime[self.foam_counter[None]] = self.foam_lifetime[p_i]
+                ti.atomic_add(self.foam_counter[None], 1)
 
-        # re-fill values
-        for p_i in self.tmp_lifetime:
-            self.foam_positions.append(self.tmp_positions[p_i])
-            self.foam_velocities.append(self.tmp_velocities[p_i])
-            self.foam_lifetime.append(self.tmp_lifetime[p_i])
-
+        # clean
+        total = self.foam_positions.length()
+        for p_i in range(total):
+            if p_i < self.foam_counter[None]:
+                self.foam_positions[p_i] = self.tmp_positions[p_i]
+                self.foam_velocities[p_i] = self.tmp_velocities[p_i]
+                self.foam_lifetime[p_i] = self.tmp_lifetime[p_i]
+            else:
+                self.foam_positions[p_i] *= 0
+                self.foam_velocities[p_i] *= 0
+                self.foam_lifetime[p_i] *= 0
+                self.tmp_positions[p_i] *= 0
+                self.tmp_velocities[p_i] *= 0
+                self.tmp_lifetime[p_i] *= 0
 
     @ti.kernel
     def compute_potential(self,):
@@ -285,7 +302,7 @@ class Foam():
                     self.curvature[p_i] += (1 - ni.dot(nj)) * Wrs
 
             delta = 0.0
-            nvel_i = vel_i.normalized()
+            nvel_i = vel_i.normalized() if vel_i.norm() > self.epsilon else vel_i
             if (nvel_i.dot(ni) >= 0.6):
                 delta = 1.0
             self.curvature[p_i] *= delta
@@ -304,15 +321,106 @@ class Foam():
         # max_curvature = ti.max(self.curvature)
         # max_energy = ti.max(self.energy)
      
+    @ti.func
+    def find_neighbors(self,):
+        # clear neighbor lookup table
+        for I in ti.grouped(self.foam_neighbors):
+            self.foam_neighbors[I] = -1
+
+        # find foam neighbors
+        for p_i in range(int(self.foam_counter[None])):
+            pos_i = self.foam_positions[p_i]
+            cell = self.fluid.get_cell(pos_i)
+            nb_i = 0
+            for offs in ti.static(ti.grouped(ti.ndrange((-1, 2), (-1, 2), (-1, 2)))):
+                cell_to_check = cell + offs
+                if self.fluid.is_in_grid(cell_to_check):
+                    for j in range(self.grid_num_particles[cell_to_check]):
+                        p_j = self.grid2particles[cell_to_check, j]
+                        if nb_i < self.max_num_neighbors and p_j != p_i and (pos_i - self.positions[p_j]).norm() < self.neighbor_radius:
+                            self.foam_neighbors[p_i, nb_i] = p_j
+                            nb_i += 1
+            self.foam_num_neighbors[p_i] = nb_i
+
+            # classify white particles by "num of neighbors"
+            # foam
+            self.foam_type[p_i] = 1 
+            # spray
+            if nb_i < 3: self.foam_type[p_i] = 0
+            # bubble
+            if nb_i > 8: self.foam_type[p_i] = 2
+
+
+    @ti.kernel
+    def advectFoam(self,):
+        self.find_neighbors()
+
+        for p_i in range(int(self.foam_counter[None])):
+            type = int(self.foam_type[p_i])
+            pos_i = self.foam_positions[p_i]
+            vel_i = self.foam_velocities[p_i]
+            pos_i = self.fluid.confine_position_to_boundary(pos_i)
+            if (type == 0): # spray
+                vel_i += self.timeStepSize * self.g
+                pos_i += self.timeStepSize * vel_i
+            elif (type == 1) or (type == 2): # foam / bubbles
+                vf = ti.Vector([0.0, 0.0, 0.0])
+                sumK = 0.0
+                for j in range(self.foam_num_neighbors[p_i]):
+                    p_j = self.particle_neighbors[p_i, j]
+                    if p_j < 0:
+                        break
+                    pos_ji = pos_i - self.positions[p_j]
+                    vel_j = self.foam_velocities[p_j]
+                    K = self.cubic_W(pos_ji.norm())
+
+                    vf += vel_j * K
+                    sumK += K
+                vf = vf / sumK
+
+                if (type == 1):
+                    pos_i += self.timeStepSize * vf
+                elif (type == 2):
+                    vel_i += self.k_drag*(vf-vel_i) - self.timeStepSize*self.k_buoyancy*self.g
+                    pos_i += self.timeStepSize * vel_i
+            
+            pos_i = self.fluid.confine_position_to_boundary(pos_i)
+            # self.foam_positions[p_i] = pos_i
+            # self.foam_velocities[p_i] = vel_i # (self.foam_positions[p_i] - self.tmp_positions[p_i]) / self.timeStepSize
 
     def run(self,):
         self.compute_density()
         self.compute_normal()
         self.compute_potential()
 
-        if self.frame_num[None] > 500:
-            self.removeParticles()
-            self.generateFoamParticles()
+        if self.frame_num[None] > 50:
+            self.removeFoam()
+            self.advectFoam()
+            self.generateFoam()
+
+    def prepareFoam(self,):
+        return self.foam_positions
+        # if self.foam_counter[None] > 0:
+        #     x = self.foam_positions.to_numpy()[:self.foam_counter[None]]
+        #     foam_particles = ti.Vector.field(self.dim, float)
+        #     ti.root.dense(ti.i, self.foam_counter[None]).place(foam_particles)
+        #     foam_particles.from_numpy(x)
+        #     return foam_particles
+        # else:
+        #     return self.foam_positions
+
+        # if self.foam_counter[None] > 0:
+        #     foam_particles = ti.Vector.field(self.dim, float)
+        #     ti.root.dense(ti.i, self.foam_counter[None]).place(foam_particles)
+        #     @ti.kernel
+        #     def assigner():
+        #         for p_i in foam_particles:
+        #             foam_particles[p_i] = self.foam_positions[p_i]
+        #     assigner()
+        #     return foam_particles
+        # else:
+        #     return self.foam_positions
+
 
 # BACKUP: PCA based normal estimation
     # def pca_norm(self, points):
