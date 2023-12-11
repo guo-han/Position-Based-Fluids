@@ -1,12 +1,12 @@
 import math
 import numpy as np
 import taichi as ti
-
+from StaticRigidBody import StaticRigidBody
 @ti.data_oriented
 class Pbf():
     def __init__(self, k) -> None:
         # scale factor
-        self.k = k
+        self.k = k  # control self.boundry, num_particles_xyz and move board velocity strength
         # config fulid grid
         grid_res = (300, 200, 100)
         screen_to_world_ratio = 10.0
@@ -66,7 +66,21 @@ class Pbf():
         # 0: x-pos, 1: timestep in sin()
         self.board_states = ti.Vector.field(2, float)
 
-        ti.root.dense(ti.i, self.num_particles).place(self.old_positions, self.positions, self.velocities, self.omegas, self.vorticity_forces, self.density)
+        self.rb_fp_collision_stiffness = 5000    # TODO: check this setting
+        self.forces = ti.Vector.field(self.dim, float)
+        self.rb = None
+        self.rb_particle_collision_set = ti.Vector.field(self.dim, float)
+        self.rb_particle_collision_idx_set = ti.field(int)
+        self.rb_particle_collision_num = ti.field(int)
+        self.confirmed_rb_particle_collision_num = ti.field(int)
+        self.sdf_negative_indices = ti.field(int)
+        self.sdf_negatives = ti.field(float)
+        self.primitive_indices = ti.field(int)
+        self.particle_colors = ti.Vector.field(3, float)
+
+        ti.root.dense(ti.i, self.num_particles).place(self.old_positions, self.positions, self.velocities, self.omegas, self.vorticity_forces, \
+                                                      self.density, self.forces, self.rb_particle_collision_set, self.rb_particle_collision_idx_set, self.particle_colors,\
+                                                      self.sdf_negative_indices, self.sdf_negatives, self.primitive_indices)
         grid_snode = ti.root.dense(ti.ijk, self.grid_size)
         grid_snode.place(self.grid_num_particles)
         grid_snode.dense(ti.l, self.max_num_particles_per_cell).place(self.grid2particles)
@@ -74,7 +88,22 @@ class Pbf():
         nb_node.place(self.particle_num_neighbors)
         nb_node.dense(ti.j, self.max_num_neighbors).place(self.particle_neighbors)
         ti.root.dense(ti.i, self.num_particles).place(self.lambdas, self.position_deltas, self.velocities_deltas)
-        ti.root.place(self.board_states)
+        ti.root.place(self.board_states, self.rb_particle_collision_num, self.confirmed_rb_particle_collision_num)
+
+        self.rb_particle_collision_num[None] = 0
+        self.confirmed_rb_particle_collision_num[None] = 0
+
+        self.colors = np.tile(
+            np.array([6.0/255.0,133.0/255.0,135.0/255.0], dtype=np.float32), (self.num_particles, 1)
+        )
+
+        self.reset_color()
+
+    def set_rigid_body(self, rb):
+        self.rb = rb
+
+    def reset_color(self):
+        self.particle_colors.from_numpy(self.colors)
 
     @ti.kernel
     def init_particles(self):
@@ -176,19 +205,85 @@ class Pbf():
             density_constraint += self.poly6_value(0, self.h_)  # self contribution
             self.density[p_i] = density_constraint * self.mass
 
+    @ti.func
+    def clear_forces(self):
+        for i in self.forces:
+            self.forces[i] *= 0.0
+    
+    @ti.func
+    def collect_set_of_potential_collided_particles_ti_v(self, grid_idx: ti.template(), accumulated_count: ti.int32):
+        for idx in range(self.grid_num_particles[grid_idx]):
+            p_idx = self.grid2particles[grid_idx[0], grid_idx[1], grid_idx[2], idx]
+            p_pos = self.positions[p_idx]
+            self.rb_particle_collision_set[idx + accumulated_count] = p_pos
+            self.rb_particle_collision_idx_set[idx + accumulated_count] = p_idx
+   
     @ti.kernel
-    def prologue(self):
+    def collect_set_of_potential_collided_particles(self):
+        self.rb_particle_collision_num[None] = 0
+        counter = 0
+        for I in ti.static(range(self.rb.grid_AABB.shape[0])): 
+            grid_idx = self.rb.grid_AABB[I]
+            self.collect_set_of_potential_collided_particles_ti_v(grid_idx, counter)
+            grid_num = self.grid_num_particles[grid_idx[0], grid_idx[1], grid_idx[2]]
+            counter += grid_num
+        self.rb_particle_collision_num[None] = counter
+    
+    @ti.kernel
+    def apply_colision_forces_after_collision_detect(self):  
+        for i in range(self.confirmed_rb_particle_collision_num[None]):
+            idx = self.sdf_negative_indices[i]
+            p_idx = self.rb_particle_collision_idx_set[idx]
+            self.particle_colors[p_idx] = [0.0, 1.0, 0.0]   # TODO: change the specification format latter
+            collision_force = self.rb_fp_collision_stiffness * (-self.sdf_negatives[i]) * self.rb.faceN[self.primitive_indices[i]]
+            self.forces[p_idx] += collision_force # TODO: pos or collision point???????
+
+    def add_fluid_rb_collision_forces(self):
+        self.collect_set_of_potential_collided_particles()
+        if self.rb_particle_collision_num[None] == 0:
+            return
+        potential_positions = self.rb_particle_collision_set.to_numpy()[:self.rb_particle_collision_num[None]]
+        sdfs, primitive_indices = self.rb.get_sdf_prims_o3d(potential_positions)
+        self.confirmed_rb_particle_collision_num[None] = np.count_nonzero(sdfs < 0) # TODO: self.particle_radius_in_world)
+        if self.confirmed_rb_particle_collision_num[None] == 0:
+            return
+        
+        sdf_negative_indices_np = np.zeros(shape = (self.num_particles,), dtype = int)
+        sdf_negative_indices_np[:self.confirmed_rb_particle_collision_num[None]] = np.where(sdfs < 0)[0]
+        self.sdf_negative_indices.from_numpy(sdf_negative_indices_np)
+
+        sdf_negative_np = np.zeros(shape = (self.num_particles, ), dtype = np.float32)
+        sdf_negative_np[:self.confirmed_rb_particle_collision_num[None]] = sdfs[np.where(sdfs < 0)]
+        self.sdf_negatives.from_numpy(sdf_negative_np)
+
+        primitive_indices_np = np.zeros(shape = (self.num_particles, ), dtype = int)
+        primitive_indices_np[:self.confirmed_rb_particle_collision_num[None]] = primitive_indices[np.where(sdfs < 0)]
+        self.primitive_indices.from_numpy(primitive_indices_np)
+        
+        self.reset_color()
+        self.apply_colision_forces_after_collision_detect()
+
+    @ti.kernel
+    def prologue_part1(self):
         # save old positions
         for i in self.positions:
             self.old_positions[i] = self.positions[i]
+        # apply external forces to fluid
+        self.clear_forces()
         # apply gravity within boundary
+        g = ti.Vector([0.0, -9.8, 0.0])
+        G = self.mass * g
         for i in self.positions:
-            g = ti.Vector([0.0, -9.8, 0.0])
-            pos, vel = self.positions[i], self.velocities[i]
-            vel += g * self.time_delta
-            pos += vel * self.time_delta
-            self.positions[i] = self.confine_position_to_boundary(pos)
+            self.forces[i] += G
 
+    @ti.kernel
+    def prologue_part2(self):
+        # apply external forces, update velocities and positions
+        for i in self.velocities:
+            self.velocities[i] += self.forces[i] / self.mass * self.time_delta
+            self.positions[i] += self.velocities[i] * self.time_delta
+            self.positions[i] = self.confine_position_to_boundary(self.positions[i])
+        # TODO: if consider dynamiics 跳掉了add boundary collision impulses，需不需要confine rigid body positions to boundary
         # clear neighbor lookup table
         for I in ti.grouped(self.grid_num_particles):
             self.grid_num_particles[I] = 0
@@ -217,6 +312,14 @@ class Pbf():
                             nb_i += 1
             self.particle_num_neighbors[p_i] = nb_i
 
+
+    def prologue(self):
+        self.prologue_part1()
+        # TODO: add update grid here?
+        # if rigid body is given, apply fluid, rigid body collision forces to fluid particles and rigid bodies.
+        if self.rb != None:
+            self.add_fluid_rb_collision_forces()
+        self.prologue_part2()
 
     @ti.kernel
     def substep(self,):
@@ -321,4 +424,4 @@ class Pbf():
                 self.velocities_deltas[i] += self.mass * (self.velocities[p_j] - self.velocities[i]) * self.poly6_value(pos_ji.norm(), self.h_) / (self.epsilon + self.density[p_j])
         
         for i in self.positions:
-            self.velocities[i] += 0.1 * self.velocities_deltas[i]
+            self.velocities[i] += 0.1 * self.velocities_deltas[i]   # note: 0.1 is xsph constant, 0.01 in the paper

@@ -5,11 +5,13 @@ import taichi as ti
 from PBF import Pbf
 from FOAM import Foam
 from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line
+from StaticRigidBody import StaticRigidBody
+from rb_config import *
 
 # scale factor
 k = 3 
 # config rendering
-ti.init(arch=ti.gpu)
+ti.init(arch=ti.gpu)    # , debug=True
 screen_res = (800, 400)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
@@ -19,7 +21,8 @@ points_pos = ti.Vector.field(3, dtype=ti.f32, shape = 8) # boarder corners
 # init objects
 fluid = Pbf(k)
 foam = Foam(fluid)
-# rigid = RigidBody()
+rock_rb = StaticRigidBody(sample_rock_config_dict, fluid.cell_recpr, fluid.grid_size)          # , 1 / 2.51, (36, 24, 12)
+fluid.set_rigid_body(rock_rb)
 
 def render(window, scene, canvas, camera):
     camera.track_user_inputs(window, movement_speed=0.03, hold_key=ti.ui.RMB)
@@ -39,7 +42,9 @@ def render(window, scene, canvas, camera):
     points_pos[7] = [b[0], -1, board_len]
     
     scene.lines(points_pos, color = (0.28, 0.68, 0.99), width = 10.0)
-    scene.particles(fluid.positions, color = particle_color, radius = 0.1)
+    scene.particles(fluid.positions, color = particle_color, radius = 0.1, per_vertex_color = fluid.particle_colors)
+    scene.mesh(rock_rb.V, rock_rb.F, rock_rb.vertexN, rock_rb.color)    # , test_rb.color
+
     scene.set_camera(camera)
 
     canvas.scene(scene)
@@ -83,6 +88,12 @@ def main():
 
     scene.point_light(pos=(1, 2, 3), color=(1,1,1))
     scene.ambient_light((0.8, 0.8, 0.8))
+
+    # top-down view
+    # camera.position(fluid.boundary[0]/2, 100, 20)
+    # camera.lookat(fluid.boundary[0]/2, 0, 0)
+
+    # side view
     camera.position(fluid.boundary[0]/2, fluid.boundary[1]/2, 40 * k)
     camera.lookat(fluid.boundary[0]/2, fluid.boundary[1]/4, 0)
     camera.up(0, 1, 0)
@@ -92,7 +103,7 @@ def main():
 
     frame = 0
     start = True
-    bake_mesh = True
+    bake_mesh = False
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break

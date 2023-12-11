@@ -2,6 +2,7 @@ import os
 import subprocess
 import numpy as np
 import json
+import taichi as ti
 
 PROJ_PATH = os.path.dirname(os.path.realpath(__file__))
 PARTICLE_dir = "particles"
@@ -63,3 +64,20 @@ def read_obj(filename):
     faces = np.array(faces) - 1
     obj_data = {'vertices': vertices, 'faces': faces}
     return obj_data
+
+# @ti.func
+def get_cell(pos, cell_recpr):
+    return int(pos * cell_recpr)
+
+@ti.func
+def get_cell_ti_v(pos, cell_recpr):
+    return int(pos * cell_recpr)
+
+@ti.func
+def clamp_ti_v(x, min, max):
+    ret = x
+    if x < min:
+        ret = min
+    elif x > max:
+        ret = max
+    return ret
