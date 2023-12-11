@@ -43,6 +43,7 @@ class Pbf():
         self.pbf_num_iters = 5
         self.corr_deltaQ_coeff = 0.2
         self.corrK = 0.01
+        self.g = ti.Vector([0.0, -9.8, 0.0])
         # Need ti.pow()
         # corrN = 4.0
         self.neighbor_radius = self.h_ * 1.05
@@ -271,8 +272,7 @@ class Pbf():
         # apply external forces to fluid
         self.clear_forces()
         # apply gravity within boundary
-        g = ti.Vector([0.0, -9.8, 0.0])
-        G = self.mass * g
+        G = self.mass * self.g
         for i in self.positions:
             self.forces[i] += G
 
