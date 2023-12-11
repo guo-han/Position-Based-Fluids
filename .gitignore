@@ -4,3 +4,4 @@ meshes
 particles
 rigids
 reconstruct.py
+/rendering

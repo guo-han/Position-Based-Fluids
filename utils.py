@@ -7,9 +7,11 @@ PROJ_PATH = os.path.dirname(os.path.realpath(__file__))
 PARTICLE_dir = "particles"
 RIGID_dir = "rigids"
 MESH_dir = "meshes"
+RENDER_dir = "rendering"
 os.makedirs(os.path.join(PROJ_PATH, PARTICLE_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, RIGID_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, MESH_dir),exist_ok=True)
+os.makedirs(os.path.join(PROJ_PATH, RENDER_dir),exist_ok=True)
 
 def convert_json_to_mesh_command_line(filename, 
                                       particle_radius=0.8,
