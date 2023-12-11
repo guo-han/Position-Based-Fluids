@@ -1,6 +1,7 @@
 import os
 import subprocess
 import numpy as np
+import taichi as ti
 import json
 
 PROJ_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -46,6 +47,7 @@ def write_obj(vertices, faces, filename):
 def read_obj(filename):
     # Read the OBJ file and store vertices and faces in a dictionary
     vertices = []
+    normals = []
     faces = []
     
     with open(filename, 'r') as f:
@@ -57,11 +59,16 @@ def read_obj(filename):
             if parts[0] == 'v':
                 vertex = tuple(map(float, parts[1:]))
                 vertices.append(vertex)
+            elif parts[0] == 'vn':
+                normal = tuple(map(float, parts[1:]))
+                normals.append(normal)
             elif parts[0] == 'f':
                 face = tuple(map(int, [p.split('/')[0] for p in parts[1:]]))
                 faces.append(face)
 
     vertices = np.array(vertices)
+    normals = np.array(normals)
     faces = np.array(faces) - 1
-    obj_data = {'vertices': vertices, 'faces': faces}
+    obj_data = {'vertices': vertices, 'normals': normals, 'faces': faces}
     return obj_data
+

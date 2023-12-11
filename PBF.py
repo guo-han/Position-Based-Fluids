@@ -43,6 +43,7 @@ class Pbf():
         self.pbf_num_iters = 5
         self.corr_deltaQ_coeff = 0.2
         self.corrK = 0.01
+        self.g = ti.Vector([0.0, -9.8, 0.0])
         # Need ti.pow()
         # corrN = 4.0
         self.neighbor_radius = self.h_ * 1.05
@@ -183,9 +184,8 @@ class Pbf():
             self.old_positions[i] = self.positions[i]
         # apply gravity within boundary
         for i in self.positions:
-            g = ti.Vector([0.0, -9.8, 0.0])
             pos, vel = self.positions[i], self.velocities[i]
-            vel += g * self.time_delta
+            vel += self.g * self.time_delta
             pos += vel * self.time_delta
             self.positions[i] = self.confine_position_to_boundary(pos)
 
