@@ -79,7 +79,6 @@ def run():
 
 def main():
     fluid.init_particles()
-    foam.init_particles()
 
     window = ti.ui.Window("PBF3D", screen_res)
     canvas = window.get_canvas()
