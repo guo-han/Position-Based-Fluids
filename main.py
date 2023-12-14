@@ -47,7 +47,7 @@ def render(window, scene, canvas, camera):
     points_pos[7] = [b[0], -1, board_len]
     
     scene.lines(points_pos, color = (0.28, 0.68, 0.99), width = 10.0)
-    scene.particles(fluid.positions, color = particle_color, radius = 0.1, per_vertex_color = fluid.particle_colors)
+    # scene.particles(fluid.positions, color = particle_color, radius = 0.1, per_vertex_color = fluid.particle_colors)
     # scene.particles(foam.foam_positions, color = foam_color, radius = 0.1)
     scene.particles(foam.white_particles, color = foam_color, radius = 0.1)
     scene.particles(foam.red_particles, color = red_color, radius = 0.1)
