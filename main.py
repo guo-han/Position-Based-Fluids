@@ -4,7 +4,8 @@ import numpy as np
 import taichi as ti
 from PBF import Pbf
 from FOAM import Foam
-from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line
+from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line, convert_foam_info_to_json
+from utils import convert_json_to_foam_command_line
 from StaticRigidBody import StaticRigidBody
 from rb_config import *
 
@@ -62,14 +63,17 @@ def print_stats():
     print(f"  #neighbors per particle: avg={avg:.2f} max={max_}")
     print("Vorticity force of particle 0: {}".format(fluid.vorticity_forces[0]))
 
-def bake(frame, start=150, end=160):
+def bake(frame, bake_foam = False,start=150, end=160):
     if frame >= start and frame < end:
         print(f"Baking frame {frame-start+1}/{end-start}")
         filename = f"frame_{frame:05d}"
         pos_np = fluid.positions.to_numpy()
         # pos_np = pos_np[:, (0, 2, 1)] # why???
+        foam_np = foam.foam_positions.to_numpy()
         convert_particle_info_to_json(pos_np, filename)
+        convert_foam_info_to_json(foam_np, filename)
         convert_json_to_mesh_command_line(filename)
+        # convert_json_to_foam_command_line(filename)
 
 def run():
     fluid.move_board()
@@ -103,18 +107,19 @@ def main():
 
     frame = 0
     start = True
-    bake_mesh = False
+    bake_mesh = True
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break
             if window.event.key in [ti.ui.SPACE]: start = not start
         if start:
             run()
-        if bake_mesh:
-            bake(frame, bake_foam=True)
+            if bake_mesh:
+                bake(frame, bake_foam=True)
+            frame += 1
         # rendering
         render(window, scene, canvas, camera)
-        frame += 1
+        
 
 if __name__ == "__main__":
     main()

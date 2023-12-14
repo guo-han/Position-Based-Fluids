@@ -7,19 +7,26 @@ import logging
 import json
 import colorsys
 from math import sin, cos, pi
+from tqdm import tqdm
 TAU = 2*pi
 
 def main():
     dir_mesh = './meshes/'
     dir_rendering = './rendering/'
     dir_particles = './particles/'
+    dir_foam = './foam/'
+    dir_rigid = './data/models/'
     path_envmap= './textures/Skies-001.jpg'
 
     path_video = "./rendering/test.avi"
     obj_name_list = sorted(os.listdir(dir_mesh))
+    foam_name_list = sorted(os.listdir(dir_foam))
+    rigid_name_list = sorted(os.listdir(dir_rigid))
     obj_list_num = len(obj_name_list)
     # obj_path = dir_path+obj_name+".obj"
     obj_path_list = [dir_mesh+obj_name for obj_name in obj_name_list]
+    foam_path_list = [dir_foam + foam_name for foam_name in foam_name_list]
+    rigid_path_list = [dir_rigid + rigid_name for rigid_name in rigid_name_list]
     # render_img_path = dir_path+obj_name+"_render_total.png"
     render_img_path = []
     obj_name_list_wo_ext = []
@@ -56,6 +63,17 @@ def main():
     mat.node_tree.nodes['Glass BSDF'].inputs['IOR'].default_value = 1.33
     inp = mat.node_tree.nodes['Material Output'].inputs['Surface']
     outp = mat.node_tree.nodes['Glass BSDF'].outputs['BSDF']
+    mat.node_tree.links.new(inp,outp)
+
+    # create diffuse white material
+    mat = bpy.data.materials.new(name="FoamMaterial")
+    mat.use_nodes = True
+    mat.node_tree.nodes.new(type='ShaderNodeBsdfDiffuse')
+    mat.node_tree.nodes['Diffuse BSDF'].inputs['Roughness'].default_value = 0.0
+    mat.node_tree.nodes['Diffuse BSDF'].inputs['Color'].default_value = (0.8, 0., 0., 1)
+    # mat.node_tree.nodes['Glass BSDF'].inputs['IOR'].default_value = 1.33
+    inp = mat.node_tree.nodes['Material Output'].inputs['Surface']
+    outp = mat.node_tree.nodes['Diffuse BSDF'].outputs['BSDF']
     mat.node_tree.links.new(inp,outp)
 
     scene = bpy.context.scene
@@ -99,7 +117,9 @@ def main():
     # scene.render.resolution_y = 1080
     # scene.render.image_settings.file_format = 'PNG'
     
-    for i in range(obj_list_num):
+    # for i in range()
+
+    for i in range(1):
         # load water
         obj_name = obj_name_list_wo_ext[i]
         bpy.ops.import_scene.obj(filepath=obj_path_list[i]) # import water
@@ -109,9 +129,41 @@ def main():
         water.data.materials.clear()
         water.data.materials.append(bpy.data.materials["WaterMaterial"])     
         scene.render.filepath = render_img_path[i]
+        # calculate water center
+        local_bbox_center = 0.125 * sum((Vector(b) for b in water.bound_box), Vector())
+        global_bbox_center = water.matrix_world @ local_bbox_center
+        # print(global_bbox_center)
+        # 
+        
+        # load foam
+        with open(foam_path_list[i], 'r') as load_foam:
+            foam_pos_all = json.load(load_foam)
+        foam_all = []
+        for j in tqdm(range(1000)):
+            bpy.ops.mesh.primitive_ico_sphere_add(
+                subdivisions=1,
+                radius=0.2)
+            obj = bpy.context.active_object
+            foam_pos = foam_pos_all[j]
+            obj.location = (foam_pos[0] * scale_ratio[0], 
+                            -foam_pos[2] * scale_ratio[2],
+                            foam_pos[1] * scale_ratio[1])
+
+            foam_all.append(obj)
+            bpy.ops.transform.resize(value=(scale_ratio[0], scale_ratio[1], scale_ratio[2]))
+            obj.data.materials.clear()
+            obj.data.materials.append(bpy.data.materials["FoamMaterial"])
+
+
+        # render and remove object
         bpy.ops.render.render(write_still=True, use_viewport=False)
         water.select_set(True)
         bpy.ops.object.delete()
+
+        # for j in range(1000):
+        #     foam = foam_all[j]
+        #     foam.select_set(True)
+        #     bpy.ops.object.delete()
 
     scene.render.use_sequencer = True
     scene.sequence_editor_create()
