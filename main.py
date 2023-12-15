@@ -11,7 +11,7 @@ from rb_config import *
 # scale factor
 k = 3
 # config rendering
-ti.init()    # , debug=True
+ti.init(arch=ti.gpu)  # , debug=True
 screen_res = (800, 400)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
@@ -44,7 +44,7 @@ def render(window, scene, canvas, camera):
     
     scene.lines(points_pos, color = (0.28, 0.68, 0.99), width = 10.0)
     scene.particles(fluid.positions, color = particle_color, radius = 0.1, per_vertex_color = fluid.particle_colors)
-    scene.particles(foam.foam_positions, color = foam_color, radius = 0.1)
+    scene.particles(foam.all_foam_pos, color = foam_color, radius = 0.1)
     scene.mesh(rock_rb.V, rock_rb.F, rock_rb.vertexN, rock_rb.color) 
     scene.set_camera(camera)
 
