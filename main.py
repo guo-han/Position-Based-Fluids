@@ -25,7 +25,7 @@ points_pos = ti.Vector.field(3, dtype=ti.f32, shape = 8) # boarder corners
 # init objects
 fluid = Pbf(k)
 foam = Foam(fluid)
-rock_rb = StaticRigidBody(sample_rock_config_dict, fluid.cell_recpr, fluid.grid_size)          # , 1 / 2.51, (36, 24, 12)
+rock_rb = StaticRigidBody(sample_rock_config_dict, fluid.cell_recpr, fluid.grid_size)
 fluid.set_rigid_body(rock_rb)
 
 def render(window, scene, canvas, camera):
@@ -103,6 +103,8 @@ def main():
     # side view
     camera.position(fluid.boundary[0]/2, fluid.boundary[1]/2, 40 * k)
     camera.lookat(fluid.boundary[0]/2, fluid.boundary[1]/4, 0)
+    # camera.position(-fluid.boundary[0]/2, fluid.boundary[1]/4, fluid.boundary[2]/2)
+    # camera.lookat(0, fluid.boundary[1]/4, fluid.boundary[2]/2)
     camera.up(0, 1, 0)
     camera.projection_mode(ti.ui.ProjectionMode.Perspective)
 
