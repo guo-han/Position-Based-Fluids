@@ -4,19 +4,20 @@ import numpy as np
 import taichi as ti
 import json
 import taichi as ti
+import open3d as o3d
 
 PROJ_PATH = os.path.dirname(os.path.realpath(__file__))
 PARTICLE_dir = "particles"
 FOAM_dir = "foam"
 RIGID_dir = "rigids"
 MESH_dir = "meshes"
-FOAM_MESH_dir="foam_meshes"
+FOAM_PCD_dir="foam_pcd"
 RENDER_dir = "rendering"
 os.makedirs(os.path.join(PROJ_PATH, PARTICLE_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, FOAM_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, RIGID_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, MESH_dir),exist_ok=True)
-os.makedirs(os.path.join(PROJ_PATH, FOAM_MESH_dir),exist_ok=True)
+os.makedirs(os.path.join(PROJ_PATH, FOAM_PCD_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, RENDER_dir),exist_ok=True)
 
 def convert_json_to_mesh_command_line(filename, 
@@ -33,20 +34,6 @@ def convert_json_to_mesh_command_line(filename,
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     _, _ = process.communicate() # output, error
 
-def convert_json_to_foam_command_line(filename, 
-                                      particle_radius=0.3,
-                                      smoothing_length=.001,
-                                      cube_size=0.3,
-                                      surface_threshold=0.2
-                                     ):
-    # need to install rust tool chain & splashsurf: https://github.com/w1th0utnam3/splashsurf
-    filepath_particle = os.path.join(FOAM_dir, filename + ".json") 
-    filename_mesh = filename + ".obj"
-    # todo: splashsurf supports batch processing, but only for .vtk and not for .obj
-    bashCommand = "splashsurf reconstruct {} --output-dir={} -o {} --particle-radius={} --smoothing-length={} --cube-size={} --surface-threshold={} --normals=on".format(filepath_particle, FOAM_MESH_dir, filename_mesh, particle_radius, smoothing_length, cube_size, surface_threshold)
-    process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
-    _, _ = process.communicate() # output, error
-
 # particle to mesh
 def convert_particle_info_to_json(input, filename):
     filepath = os.path.join(PROJ_PATH, PARTICLE_dir, filename + ".json")
@@ -59,6 +46,26 @@ def convert_foam_info_to_json(input, filename):
     input_list = input.tolist()
     with open(filepath, 'w') as outfile:
         json.dump(input_list, outfile)
+
+def convert_foam_info_to_pcd(input, filename):
+    """
+    input: foam positions
+    filename: frame_00xxx
+    """
+    filepath = os.path.join(PROJ_PATH, FOAM_PCD_dir, filename + "_foam.ply")
+    num_foam = len(input)
+    point_cloud = np.zeros((num_foam,3))
+    for i in range(num_foam):
+        point_cloud[i] = np.array([input[i][0], -input[i][2], input[i][1]])
+    
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(point_cloud)
+    o3d.io.write_point_cloud(filepath, pcd)
+
+def convert_rigid_info_to_json(input, filename):
+    filepath = os.path.join(PROJ_PATH, RIGID_dir, filename + ".json")
+    with open(filepath, 'w') as outfile:
+        json.dump(input, outfile)
 
 
 def write_obj(vertices, faces, filename):
