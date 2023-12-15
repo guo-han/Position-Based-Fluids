@@ -4,15 +4,20 @@ import numpy as np
 import taichi as ti
 import json
 import taichi as ti
+import open3d as o3d
 
 PROJ_PATH = os.path.dirname(os.path.realpath(__file__))
 PARTICLE_dir = "particles"
+FOAM_dir = "foam"
 RIGID_dir = "rigids"
 MESH_dir = "meshes"
+FOAM_PCD_dir="foam_pcd"
 RENDER_dir = "rendering"
 os.makedirs(os.path.join(PROJ_PATH, PARTICLE_dir),exist_ok=True)
+os.makedirs(os.path.join(PROJ_PATH, FOAM_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, RIGID_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, MESH_dir),exist_ok=True)
+os.makedirs(os.path.join(PROJ_PATH, FOAM_PCD_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, RENDER_dir),exist_ok=True)
 
 def convert_json_to_mesh_command_line(filename, 
@@ -35,6 +40,32 @@ def convert_particle_info_to_json(input, filename):
     input_list = input.tolist()
     with open(filepath, 'w') as outfile:
         json.dump(input_list, outfile)
+
+def convert_foam_info_to_json(input, filename):
+    filepath = os.path.join(PROJ_PATH, FOAM_dir, filename + ".json")
+    input_list = input.tolist()
+    with open(filepath, 'w') as outfile:
+        json.dump(input_list, outfile)
+
+def convert_foam_info_to_pcd(input, filename):
+    """
+    input: foam positions
+    filename: frame_00xxx
+    """
+    filepath = os.path.join(PROJ_PATH, FOAM_PCD_dir, filename + "_foam.ply")
+    num_foam = len(input)
+    point_cloud = np.zeros((num_foam,3))
+    for i in range(num_foam):
+        point_cloud[i] = np.array([input[i][0], -input[i][2], input[i][1]])
+    
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(point_cloud)
+    o3d.io.write_point_cloud(filepath, pcd)
+
+def convert_rigid_info_to_json(input, filename):
+    filepath = os.path.join(PROJ_PATH, RIGID_dir, filename + ".json")
+    with open(filepath, 'w') as outfile:
+        json.dump(input, outfile)
 
 
 def write_obj(vertices, faces, filename):

@@ -5,3 +5,6 @@ particles
 rigids
 reconstruct.py
 /rendering
+/foam
+/foam_meshes
+/foam_pcd

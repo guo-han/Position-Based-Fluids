@@ -17,8 +17,8 @@ class StaticRigidBody():
         self.scale = config_dict["model_scale"]
         self.pos = config_dict["model_pos"]
         self.rot = config_dict["model_rotation"]         # TODO: model rotation
-
         self.mesh_o3d.scale(self.scale, center=self.mesh_o3d.get_center())
+        self.center = self.mesh_o3d.get_center()
         R = self.mesh_o3d.get_rotation_matrix_from_xyz((0, 0, 0))
         self.mesh_o3d.rotate(R, center=self.mesh_o3d.get_center())
         self.mesh_o3d.translate(- self.mesh_o3d.get_center() + self.pos)
