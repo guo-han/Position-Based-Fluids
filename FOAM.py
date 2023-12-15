@@ -102,7 +102,8 @@ class Foam():
         self.dim = fluid.dim
         self.r_ = fluid.particle_radius_in_world
         self.h_ = fluid.h_
-        h3 = pow(self.h_, 3)
+        self.h3 = pow(self.h_, 3)
+        self.invPI = 1 / math.pi
         self.rho0 = fluid.rho0
         self.mass = 0.8
         num_particles = fluid.num_particles
@@ -115,14 +116,15 @@ class Foam():
         
         # foam
         self.g = fluid.g
-        self.m_k = 8.0 / (math.pi * h3)
-        self.m_l = 48.0 / (math.pi * h3)
+        self.m_k = 8.0 / (math.pi * self.h3)
+        self.m_l = 48.0 / (math.pi * self.h3)
         self.inertia = 2.0
         self.foam_scale = 1
         self.timeStepSize = fluid.time_delta
-        self.k_ta = 4000
-        self.k_wc = 100000
-        self.k_vo = 4000
+        self.k_ta = 1
+        self.k_wc = 1
+        self.k_vo = 1
+        self.n = 10000
         self.k_buoyancy = 2.0
         self.k_drag = 0.8
         self.lifetimeMin = 2.0
@@ -134,7 +136,7 @@ class Foam():
         ti.root.dense(ti.i, num_particles).place(self.densities, self.omegas, self.normals)
         self.max_foam_per_particle = 3
         self.particle_to_foam_grid = FoamParticle.field(shape = (num_particles, self.max_foam_per_particle))
-        self.all_foam_pos = ti.Vector.field(3, float, shape = (num_particles * self.max_foam_per_particle))
+        self.all_foam_pos = ti.Vector.field(self.dim, float, shape = (num_particles * self.max_foam_per_particle))
         self.particle_to_foam_counter = ti.field(int, shape = (num_particles, ))
         # set all initial values to zero, taichi does not support default values of dataclass, doubt whether it is reasonable
         self.init()   # TODO: check whether it is reasonable
@@ -157,19 +159,24 @@ class Foam():
         self.curvature = ti.field(float)
         self.omega_diff = ti.field(float)
         self.energy = ti.field(float)
+        self.white_particles = ti.Vector.field(self.dim, float, shape = (num_particles * self.max_foam_per_particle))
+        self.red_particles = ti.Vector.field(self.dim, float, shape = (num_particles * self.max_foam_per_particle))
+        self.green_particles = ti.Vector.field(self.dim, float, shape = (num_particles * self.max_foam_per_particle))
+        self.yellow_particles = ti.Vector.field(self.dim, float)
         ti.root.dense(ti.i, num_particles).place(self.v_diff, self.curvature, self.omega_diff, self.energy)
+        ti.root.dense(ti.i, num_particles).place(self.yellow_particles) # self.white_particles, self.red_particles, self.green_particles, 
 
         # neighbors
         self.neighbor_radius = fluid.neighbor_radius
         self.max_num_neighbors = fluid.max_num_neighbors
         self.grid_num_particles = fluid.grid_num_particles
         self.grid2particles = fluid.grid2particles
-        self.foam_num_neighbors = ti.field(int)
-        self.foam_neighbors = ti.field(int)
+        # self.foam_num_neighbors = ti.field(int)
+        # self.foam_neighbors = ti.field(int)
 
-        nb_node = ti.root.dense(ti.i, self.max_num_white_particles)
-        nb_node.place(self.foam_num_neighbors)
-        nb_node.dense(ti.j, self.max_num_neighbors).place(self.foam_neighbors)
+        # nb_node = ti.root.dense(ti.i, self.max_num_white_particles)
+        # nb_node.place(self.foam_num_neighbors)
+        # nb_node.dense(ti.j, self.max_num_neighbors).place(self.foam_neighbors)
 
         # accumulate values
         self.frame_num = ti.field(ti.i32, shape=())
@@ -240,10 +247,13 @@ class Foam():
         for p_i in self.positions:
             pos_i = self.positions[p_i]
             ni = ti.Vector([0., 0., 0.])
+            self.yellow_particles[p_i] = ti.Vector([0., 0., 0.])
 
             # only interested in surface particles, may need a smaller threshold...
-            if self.particle_num_neighbors[p_i] > 6: # ???
+            if self.particle_num_neighbors[p_i] > 11: # 10/11??
                 continue
+
+            self.yellow_particles[p_i] = pos_i
 
             for j in range(self.particle_num_neighbors[p_i]):
                 p_j = self.particle_neighbors[p_i, j]
@@ -268,10 +278,10 @@ class Foam():
                 if p_j < 0:
                     break
                 
-                vel_j = self.velocities[p_j]
                 pos_ji = pos_i - self.positions[p_j]
+                vel_ji = vel_i - self.velocities[p_j]
 
-                omega_i -= self.mass / di * (vel_i - vel_j).cross(self.cubic_gradW(pos_ji))
+                omega_i -= self.mass / di * vel_ji.cross(self.cubic_gradW(pos_ji))
 
             self.omegas[p_i] = omega_i
 
@@ -282,7 +292,7 @@ class Foam():
         q = r / self.h_
         if (q <= 1.0):
             res = 1.0 - q
-        return res
+        return res * 3 * self.invPI / self.h3
         
     @ti.func
     def update_limits(self,):
@@ -334,7 +344,7 @@ class Foam():
             I_wc = clamp(self.curvature[idx], self.wcMin[None], self.wcMax[None])
             I_vo = clamp(self.omega_diff[idx], self.voMin[None], self.voMax[None])
             I_ke = clamp(self.energy[idx], self.keMin[None], self.keMax[None])
-            num = int(max(self.foam_scale * I_ke * (self.k_ta*I_ta + self.k_wc*I_wc + self.k_vo*I_vo) * self.timeStepSize + 0.5, 0.0))
+            num = int(max(self.foam_scale * I_ke * (self.k_ta*I_ta + self.k_wc*I_wc + self.k_vo*I_vo) * self.timeStepSize * self.n + 0.5, 0.0))
             # nt = int(self.foam_scale * I_ke * self.k_ta * I_ta * self.timeStepSize + 0.5)
             # nw = int(self.foam_scale * I_ke * self.k_wc * I_wc * self.timeStepSize + 0.5)
 
@@ -427,14 +437,14 @@ class Foam():
                 Wrs = self.foam_W(mag_pos)
 
                 # Trapped Air Potential
-                self.v_diff[p_i] += mag_vel * (1 - nvel_ji.dot(npos_ji)) * Wrs * self.mass / self.densities[p_j]
+                self.v_diff[p_i] += mag_vel * (1 - nvel_ji.dot(npos_ji)) * Wrs
 
                 # Wave Crest Curvature
                 if (-npos_ji.dot(ni) < 0):
-                    self.curvature[p_i] += (1 - ni.dot(nj)) * Wrs * self.mass / self.densities[p_j]
+                    self.curvature[p_i] += (1 - ni.dot(nj)) * Wrs
 
                 # vorticity
-                self.omega_diff[p_i] += (self.omegas[p_i] - self.omegas[p_j]).norm() * Wrs * self.mass / self.densities[p_j]
+                self.omega_diff[p_i] += (self.omegas[p_i] - self.omegas[p_j]).norm() * Wrs
 
             delta = 0.0
             nvel_i = vel_i.normalized() if vel_i.norm() > self.epsilon else vel_i
@@ -481,9 +491,9 @@ class Foam():
                 self.particle_to_foam_grid[iidx, jidx].set_type(1)
                 # self.foam_type[p_i] = 1 
                 # spray
-                if nb_i < 3: self.particle_to_foam_grid[iidx, jidx].set_type(0) # self.foam_type[p_i] = 0
+                if nb_i < 6: self.particle_to_foam_grid[iidx, jidx].set_type(0) # self.foam_type[p_i] = 0
                 # bubble
-                if nb_i > 8: self.particle_to_foam_grid[iidx, jidx].set_type(2) # self.foam_type[p_i] = 2
+                if nb_i > 15: self.particle_to_foam_grid[iidx, jidx].set_type(2) # self.foam_type[p_i] = 2
 
     @ti.kernel
     def advectFoam(self,):
@@ -532,17 +542,33 @@ class Foam():
             for jidx in range(self.max_foam_per_particle):    # self.particle_to_foam_counter[iidx]
                 self.all_foam_pos[iidx * self.max_foam_per_particle + jidx] = self.particle_to_foam_grid[iidx, jidx].position
 
+    @ti.kernel
+    def draw_classifiedFrom(self,):
+        for iidx in self.positions:
+            for jidx in range(self.max_foam_per_particle):    # self.particle_to_foam_counter[iidx]
+                local_idx = iidx * self.max_foam_per_particle + jidx
+                self.all_foam_pos[local_idx] = self.particle_to_foam_grid[iidx, jidx].position
+                local_type = self.particle_to_foam_grid[iidx, jidx].get_type()
+                self.white_particles[local_idx] = ti.Vector([0., 0., 0.])
+                self.green_particles[local_idx] = ti.Vector([0., 0., 0.])
+                self.red_particles[local_idx] = ti.Vector([0., 0., 0.])
+                if local_type == 0: self.green_particles[local_idx] = self.all_foam_pos[local_idx]
+                if local_type == 1: self.white_particles[local_idx] = self.all_foam_pos[local_idx]
+                if local_type == 2: self.red_particles[local_idx] = self.all_foam_pos[local_idx]
+
     def run(self,):
         self.compute_density()
         self.compute_normal()
         self.compute_omega()
         self.compute_potential()
 
-        if self.frame_num[None] > 50:
+        if self.frame_num[None] > 150:
             self.removeFoam()
             self.advectFoam()
             self.generateFoam()
             self.collect_pos_for_vis()
+
+        self.draw_classifiedFrom()
 
     # def prepareFoam(self,):
     #     return self.foam_positions
