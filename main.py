@@ -5,7 +5,7 @@ import taichi as ti
 from PBF import Pbf
 from FOAM import Foam
 from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line, convert_foam_info_to_json
-from utils import convert_json_to_foam_command_line
+from utils import convert_rigid_info_to_json, convert_foam_info_to_pcd
 from StaticRigidBody import StaticRigidBody
 from rb_config import *
 
@@ -79,7 +79,7 @@ def bake(frame, bake_foam = False,start=150, end=160):
         convert_particle_info_to_json(pos_np, filename)
         convert_foam_info_to_json(foam_np, filename)
         convert_json_to_mesh_command_line(filename)
-        # convert_json_to_foam_command_line(filename)
+        convert_foam_info_to_pcd(foam_np, filename)
 
 def run():
     fluid.move_board()
@@ -110,6 +110,16 @@ def main():
     camera.projection_mode(ti.ui.ProjectionMode.Perspective)
 
     print(f"boundary={fluid.boundary} grid={fluid.grid_size} cell_size={fluid.cell_size}")
+
+    export_rigid_info = False
+    print(rock_rb.center)
+    if export_rigid_info:
+        rigid_dict_json = {
+            "scalings": rock_rb.scale,
+            "pos": rock_rb.pos,
+            "center": rock_rb.center.tolist(),
+        }
+        convert_rigid_info_to_json(rigid_dict_json, 'rock')
 
     frame = 0
     start = True
