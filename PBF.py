@@ -67,7 +67,8 @@ class Pbf():
         # 0: x-pos, 1: timestep in sin()
         self.board_states = ti.Vector.field(2, float)
 
-        self.rb_fp_collision_stiffness = 5000    # TODO: check this setting
+        self.rb_fp_collision_stiffness = 500    # TODO: check this setting
+        # self.rb_fp_collision_sdf_lower_bound = -0.1
         self.forces = ti.Vector.field(self.dim, float)
         self.rb = None
         self.rb_particle_collision_set = ti.Vector.field(self.dim, float)
@@ -113,7 +114,7 @@ class Pbf():
             y = i // (self.num_particles_x*self.num_particles_z)
             z = (i % (self.num_particles_x*self.num_particles_z)) // self.num_particles_x
             delta = self.h_ * 0.8
-            offs = ti.Vector([self.boundary[0] * 0.16, self.boundary[1]*0.4, self.boundary[2] * 0.02])
+            offs = ti.Vector([(self.boundary[0] - delta * self.num_particles_x) * 0.95, 0, self.boundary[2] * 0.02]) # self.boundary[1] * 0.02
             self.positions[i] = ti.Vector([x, z, y]) * delta + offs
             for c in ti.static(range(self.dim)):
                 self.velocities[i][c] = (ti.random() - 0.5) * 4
@@ -218,16 +219,29 @@ class Pbf():
             p_pos = self.positions[p_idx]
             self.rb_particle_collision_set[idx + accumulated_count] = p_pos
             self.rb_particle_collision_idx_set[idx + accumulated_count] = p_idx
-   
+
+    @ti.kernel
+    def update_grid(self):
+        # update grid
+        for I in ti.grouped(self.grid_num_particles):
+            self.grid_num_particles[I] = 0
+        for p_i in self.positions:
+            cell = self.get_cell(self.positions[p_i])
+            # ti.Vector doesn't seem to support unpacking yet
+            # but we can directly use int Vectors as indices
+            offs = ti.atomic_add(self.grid_num_particles[cell], 1)
+            self.grid2particles[cell, offs] = p_i
+
     @ti.kernel
     def collect_set_of_potential_collided_particles(self):
         self.rb_particle_collision_num[None] = 0
         counter = 0
-        for I in ti.static(range(self.rb.grid_AABB.shape[0])): 
-            grid_idx = self.rb.grid_AABB[I]
-            self.collect_set_of_potential_collided_particles_ti_v(grid_idx, counter)
-            grid_num = self.grid_num_particles[grid_idx[0], grid_idx[1], grid_idx[2]]
-            counter += grid_num
+        for _ in range(1):    # To serialize loop 
+            for I in range(self.rb.grid_AABB.shape[0]): 
+                grid_idx = self.rb.grid_AABB[I]
+                self.collect_set_of_potential_collided_particles_ti_v(grid_idx, counter)
+                grid_num = self.grid_num_particles[grid_idx[0], grid_idx[1], grid_idx[2]]
+                counter += grid_num
         self.rb_particle_collision_num[None] = counter
     
     @ti.kernel
@@ -236,16 +250,28 @@ class Pbf():
             idx = self.sdf_negative_indices[i]
             p_idx = self.rb_particle_collision_idx_set[idx]
             self.particle_colors[p_idx] = [0.0, 1.0, 0.0]   # TODO: change the specification format latter
-            collision_force = self.rb_fp_collision_stiffness * (-self.sdf_negatives[i]) * self.rb.faceN[self.primitive_indices[i]]
+            dis_values = self.sdf_negatives[i]
+            # if dis_values < self.rb_fp_collision_sdf_lower_bound:
+                # dis_values = self.rb_fp_collision_sdf_lower_bound
+            collision_force = self.rb_fp_collision_stiffness * (- dis_values) * self.rb.faceN[self.primitive_indices[i]]
             self.forces[p_idx] += collision_force # TODO: pos or collision point???????
+    
+    @ti.kernel
+    def color_potential_particles(self):
+        for i in range(self.rb_particle_collision_num[None]):
+            p_idx = self.rb_particle_collision_idx_set[i]
+            self.particle_colors[p_idx] = [0.0, 0.0, 0.0]
 
     def add_fluid_rb_collision_forces(self):
         self.collect_set_of_potential_collided_particles()
+        # Visualization, TODO: comment later
+        self.reset_color()
+        self.color_potential_particles()
         if self.rb_particle_collision_num[None] == 0:
             return
         potential_positions = self.rb_particle_collision_set.to_numpy()[:self.rb_particle_collision_num[None]]
         sdfs, primitive_indices = self.rb.get_sdf_prims_o3d(potential_positions)
-        self.confirmed_rb_particle_collision_num[None] = np.count_nonzero(sdfs < 0) # TODO: self.particle_radius_in_world)
+        self.confirmed_rb_particle_collision_num[None] = np.count_nonzero(sdfs < 0)
         if self.confirmed_rb_particle_collision_num[None] == 0:
             return
         
@@ -255,13 +281,14 @@ class Pbf():
 
         sdf_negative_np = np.zeros(shape = (self.num_particles, ), dtype = np.float32)
         sdf_negative_np[:self.confirmed_rb_particle_collision_num[None]] = sdfs[np.where(sdfs < 0)]
+        # np.clip(sdf_negative_np, self.rb_fp_collision_sdf_lower_bound, 0, out=sdf_negative_np)
         self.sdf_negatives.from_numpy(sdf_negative_np)
 
         primitive_indices_np = np.zeros(shape = (self.num_particles, ), dtype = int)
         primitive_indices_np[:self.confirmed_rb_particle_collision_num[None]] = primitive_indices[np.where(sdfs < 0)]
         self.primitive_indices.from_numpy(primitive_indices_np)
         
-        self.reset_color()
+        # print(np.min(sdf_negative_np[:self.confirmed_rb_particle_collision_num[None]]), np.max(sdf_negative_np[:self.confirmed_rb_particle_collision_num[None]]))
         self.apply_colision_forces_after_collision_detect()
 
     @ti.kernel
@@ -312,12 +339,12 @@ class Pbf():
                             nb_i += 1
             self.particle_num_neighbors[p_i] = nb_i
 
-
+    ## add visualization for 
     def prologue(self):
         self.prologue_part1()
         # TODO: add update grid here?
-        # if rigid body is given, apply fluid, rigid body collision forces to fluid particles and rigid bodies.
         if self.rb != None:
+            self.update_grid()
             self.add_fluid_rb_collision_forces()
         self.prologue_part2()
 
