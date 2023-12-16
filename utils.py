@@ -3,7 +3,6 @@ import subprocess
 import numpy as np
 import taichi as ti
 import json
-import taichi as ti
 import open3d as o3d
 
 PROJ_PATH = os.path.dirname(os.path.realpath(__file__))
