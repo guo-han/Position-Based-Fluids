@@ -26,8 +26,8 @@ points_pos = ti.Vector.field(3, dtype=ti.f32, shape = 8) # boarder corners
 # init objects
 fluid = Pbf(k)
 foam = Foam(fluid)
-rock_rb = StaticRigidBody(sample_rock_config_dict, fluid.cell_recpr, fluid.grid_size)          # , 1 / 2.51, (36, 24, 12)
-fluid.set_rigid_body(rock_rb)
+rabbit_rb = StaticRigidBody(rabbit_config_dict, fluid.cell_recpr, fluid.grid_size, fluid.boundary)
+fluid.set_rigid_body(rabbit_rb)
 
 def render(window, scene, canvas, camera):
     camera.track_user_inputs(window, movement_speed=0.03, hold_key=ti.ui.RMB)
@@ -53,7 +53,7 @@ def render(window, scene, canvas, camera):
     scene.particles(foam.red_particles, color = red_color, radius = 0.1)
     scene.particles(foam.green_particles, color = green_color, radius = 0.1)
     # scene.particles(foam.yellow_particles, color = yellow_color, radius = 0.1)
-    scene.mesh(rock_rb.V, rock_rb.F, rock_rb.vertexN, rock_rb.color) 
+    scene.mesh(rabbit_rb.V, rabbit_rb.F, rabbit_rb.vertexN, rabbit_rb.color) 
     scene.set_camera(camera)
 
     canvas.scene(scene)
@@ -113,18 +113,18 @@ def main():
     print(f"boundary={fluid.boundary} grid={fluid.grid_size} cell_size={fluid.cell_size}")
 
     export_rigid_info = False
-    print(rock_rb.center)
-    if export_rigid_info:
-        rigid_dict_json = {
-            "scalings": rock_rb.scale,
-            "pos": rock_rb.pos,
-            "center": rock_rb.center.tolist(),
-        }
-        convert_rigid_info_to_json(rigid_dict_json, 'rock')
+    # print(rock_rb.center)
+    # if export_rigid_info:
+    #     rigid_dict_json = {
+    #         "scalings": rock_rb.scale,
+    #         "pos": rock_rb.pos,
+    #         "center": rock_rb.center.tolist(),
+    #     }
+    #     convert_rigid_info_to_json(rigid_dict_json, 'rock')
 
     frame = 0
     start = True
-    bake_mesh = True
+    bake_mesh = False
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break

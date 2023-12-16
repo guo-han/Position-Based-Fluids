@@ -2,26 +2,27 @@ import open3d as o3d
 import taichi as ti
 import numpy as np
 import utils
+import math
 
-# TODO: add epsilon for numerical stability?
 @ti.data_oriented
 class StaticRigidBody():
-    def __init__(self, config_dict, cell_recpr, grid_size):
+    def __init__(self, config_dict, cell_recpr, grid_size, boundary):
         self.model_name = config_dict["model_name"]
         self.mesh_o3d = o3d.io.read_triangle_mesh(config_dict["model_path"])
+        print("water tight mesh: ", self.mesh_o3d.is_watertight())
+        print("self intersecting mesh: ", self.mesh_o3d.is_self_intersecting())
         self.n_vertices = len(self.mesh_o3d.vertices)
         self.n_faces = len(self.mesh_o3d.triangles)
         print("Load model {} with {} vertices and {} faces.".format(self.model_name, self.n_vertices, self.n_faces))
-        self.origV = ti.Vector.field(3, ti.f32, self.n_vertices)
-        self.origV.from_numpy(np.asarray(self.mesh_o3d.vertices, dtype = np.float32))
+        # self.origV = ti.Vector.field(3, ti.f32, self.n_vertices)
+        # self.origV.from_numpy(np.asarray(self.mesh_o3d.vertices, dtype = np.float32))
         self.scale = config_dict["model_scale"]
         self.pos = config_dict["model_pos"]
-        self.rot = config_dict["model_rotation"]         # TODO: model rotation
+        self.rot = config_dict["model_rotation"]
         self.mesh_o3d.scale(self.scale, center=self.mesh_o3d.get_center())
-        self.center = self.mesh_o3d.get_center()
-        R = self.mesh_o3d.get_rotation_matrix_from_xyz((0, 0, 0))
+        R = self.mesh_o3d.get_rotation_matrix_from_xyz(self.rot)
         self.mesh_o3d.rotate(R, center=self.mesh_o3d.get_center())
-        self.mesh_o3d.translate(- self.mesh_o3d.get_center() + self.pos)
+        self.mesh_o3d.translate(self.pos) 
         
         self.V = ti.Vector.field(3, ti.f32, self.n_vertices)
         self.V.from_numpy(np.asarray(self.mesh_o3d.vertices, dtype = np.float32))
@@ -50,7 +51,10 @@ class StaticRigidBody():
         self.aabb_rect_indices = ti.Vector.field(6, int)
         ti.root.place(self.occupied_grid_number, self.aabb_rect_indices)
         self.init_AABB_ti_v(cell_recpr, grid_size)
-
+        # print("minxyz", self.min_xyz, " maxxyz: ", self.max_xyz)
+        # print("occupied grid number: ", self.occupied_grid_number[None])
+        # print("min max xyz: ", self.aabb_rect_indices[None])
+        # print("grid size: ", grid_size)
         self.grid_AABB = ti.Vector.field(n = 3, dtype = ti.int32, shape=(self.occupied_grid_number[None], ))
         self.init_AABB_grid_ti_v()
 
@@ -84,6 +88,6 @@ class StaticRigidBody():
         a = (aabb[3] - aabb[0])
         b = (aabb[4] - aabb[1])
         for grid_idx in ti.grouped(ti.ndrange((aabb[0], aabb[3]), (aabb[1], aabb[4]), (aabb[2], aabb[5]))):
-            index = grid_idx[0] + grid_idx[1] * a + grid_idx[2] * a * b
+            index = (grid_idx[0] - aabb[0]) + (grid_idx[1] - aabb[1]) * a + (grid_idx[2] - aabb[2]) * a * b
             self.grid_AABB[index] = grid_idx
         
