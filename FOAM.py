@@ -129,7 +129,6 @@ class Foam():
         self.k_drag = 0.8
         self.lifetimeMin = 2.0
         self.lifetimeMax = 5.0
-        self.max_num_white_particles = 30000 # 50 * num_particles
         self.densities = ti.field(float)
         self.omegas = ti.Vector.field(self.dim, float)
         self.normals = ti.Vector.field(self.dim, float)
@@ -145,14 +144,6 @@ class Foam():
         #  ###############
         #  foam_type: spray -> 0, foam -> 1, bubbles -> 2
         #  ###############
-        # ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_positions)
-        # ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_velocities)
-        # ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_lifetime)
-        # ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.foam_type)
-        # ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.tmp_positions)
-        # ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.tmp_velocities)
-        # ti.root.dynamic(ti.i, self.max_num_white_particles, chunk_size=32).place(self.tmp_lifetime)
-        # ti.root.dense(ti.i, self.max_num_white_particles).place(self.foam_positions, self.foam_velocities, self.foam_lifetime, self.foam_type)
 
         # potentials
         self.v_diff = ti.field(float)
@@ -249,7 +240,7 @@ class Foam():
             self.yellow_particles[p_i] = ti.Vector([0., 0., 0.])
 
             # only interested in surface particles, may need a smaller threshold...
-            if self.particle_num_neighbors[p_i] > 11: # 10/11??
+            if self.particle_num_neighbors[p_i] > 16: # 10/11??
                 continue
 
             self.yellow_particles[p_i] = pos_i
@@ -302,9 +293,9 @@ class Foam():
                 p[i] = bmin + self.epsilon * ti.random()
                 # v[i] *= -1
             elif bmax[i] <= p[i]:
-                p[i] = bmax[i] - self.epsilon * ti.random()
-                # p = ti.Vector([0., 0., 0.])
-                # v = ti.Vector([0., 0., 0.])
+                # p[i] = bmax[i] - self.epsilon * ti.random()
+                p = ti.Vector([0., 0., 0.])
+                v = ti.Vector([0., 0., 0.])
         return p, v
 
     @ti.func
@@ -324,13 +315,13 @@ class Foam():
 
         # compute limits
         self.taMax[None] = self.sum_max_vdiff[None] / self.frame_num[None]
-        self.taMin[None] = 0.1 * self.taMax[None]
+        self.taMin[None] = 0. * self.taMax[None]
         self.wcMax[None] = self.sum_max_curvature[None] / self.frame_num[None]
-        self.wcMin[None] = 0.1 * self.wcMax[None]
+        self.wcMin[None] = 0. * self.wcMax[None]
         self.voMax[None] = self.sum_max_omega[None] / self.frame_num[None]
-        self.voMin[None] = 0.1 * self.voMax[None]
+        self.voMin[None] = 0. * self.voMax[None]
         self.keMax[None] = self.sum_max_energy[None] / self.frame_num[None]
-        self.keMin[None] = 0.1 * self.keMax[None]
+        self.keMin[None] = 0. * self.keMax[None]
 
     @ti.func
     def getOrthogonalVectors(self, vec):
@@ -348,10 +339,6 @@ class Foam():
 
     @ti.kernel
     def generateFoam(self,):
-        total_count = 0
-        for iidx in self.positions:
-            total_count += self.particle_to_foam_counter[iidx]
-        # print("before generate foam: ", total_count)
         for idx in self.positions:
             I_ta = clamp(self.v_diff[idx], self.taMin[None], self.taMax[None])
             I_wc = clamp(self.curvature[idx], self.wcMin[None], self.wcMax[None])
@@ -384,25 +371,17 @@ class Foam():
                 xd, vd = self.confine_position_to_boundary(xd, vd)
                 self.particle_to_foam_grid[idx, self.particle_to_foam_counter[idx]].set_pvlt(xd, vd, life, 1) 
                 ti.atomic_add(self.particle_to_foam_counter[idx], 1)
-        total_count = 0
-        for iidx in self.positions:
-            total_count += self.particle_to_foam_counter[iidx]
-        # print("after generate foam: ", total_count)
 
     @ti.kernel
     def removeFoam(self,):
         # filter lifetime value
-        total_count = 0
-        for iidx in self.positions:
-            total_count += self.particle_to_foam_counter[iidx]
-        # print("before remove foam: ", total_count)
         for iidx in self.positions:
             local_counter = 0
             for jidx in range(self.particle_to_foam_counter[iidx]):
                 local_particle = self.particle_to_foam_grid[iidx, jidx]
-                if local_particle.get_type() == 1:  # check whether it is foam
+                if local_particle.get_type() > 0:  # check whether it is foam/bubble
                     self.particle_to_foam_grid[iidx, jidx].lifetime -= self.timeStepSize
-                if local_particle.get_type() == 0 or local_particle.get_type() == 2 or (local_particle.get_type() == 1 and self.particle_to_foam_grid[iidx, jidx].lifetime > self.epsilon):
+                if self.particle_to_foam_grid[iidx, jidx].lifetime > self.epsilon:
                     localp, localv, locall, localt = self.particle_to_foam_grid[iidx, jidx].get_pvlt()
                     self.particle_to_foam_grid[iidx, local_counter].set_pvlt(localp, localv, locall, localt)
                     if jidx > local_counter:
@@ -412,10 +391,6 @@ class Foam():
                     self.particle_to_foam_grid[iidx, jidx].init()
 
             self.particle_to_foam_counter[iidx] = local_counter
-        total_count = 0
-        for iidx in self.positions:
-            total_count += self.particle_to_foam_counter[iidx]
-        # print("after remove foam: ", total_count)
 
     @ti.kernel
     def compute_potential(self,):
@@ -497,22 +472,16 @@ class Foam():
                                 self.particle_to_foam_to_neighbor_grid[iidx, jidx, nb_i] = p_j
                                 nb_i += 1
                 self.particle_to_foam_to_neighbor_count[iidx, jidx] = nb_i
-                # self.foam_num_neighbors[self.particle_to_foam_accumulated_counter[iidx] + jidx] = nb_i
                 # foam
                 self.particle_to_foam_grid[iidx, jidx].set_type(1)
-                # self.foam_type[p_i] = 1 
                 # spray
-                if nb_i < 6: self.particle_to_foam_grid[iidx, jidx].set_type(0) # self.foam_type[p_i] = 0
+                if nb_i < 6: self.particle_to_foam_grid[iidx, jidx].set_type(0)
                 # bubble
-                if nb_i > 15: self.particle_to_foam_grid[iidx, jidx].set_type(2) # self.foam_type[p_i] = 2
+                if nb_i > 15: self.particle_to_foam_grid[iidx, jidx].set_type(2)
 
     @ti.kernel
     def advectFoam(self,):
         self.find_neighbors()
-        total_count = 0
-        for iidx in self.positions:
-            total_count += self.particle_to_foam_counter[iidx]
-        # print("advect foam: ", total_count)
         for iidx in self.positions:
             for jidx in range(self.particle_to_foam_counter[iidx]):
                 # self.find_
@@ -548,12 +517,6 @@ class Foam():
                 self.particle_to_foam_grid[iidx, jidx].set_pv(pos_ij, vel_ij)
 
     @ti.kernel
-    def collect_pos_for_vis(self):
-        for iidx in self.positions:
-            for jidx in range(self.max_foam_per_particle):    # self.particle_to_foam_counter[iidx]
-                self.all_foam_pos[iidx * self.max_foam_per_particle + jidx] = self.particle_to_foam_grid[iidx, jidx].position
-
-    @ti.kernel
     def draw_classifiedFrom(self,):
         for iidx in self.positions:
             for jidx in range(self.max_foam_per_particle):    # self.particle_to_foam_counter[iidx]
@@ -572,11 +535,10 @@ class Foam():
         self.compute_normal()
         self.compute_omega()
         self.compute_potential()
-
-        if self.frame_num[None] > 150:
+        
+        if self.frame_num[None] > -1:
             self.removeFoam()
             self.advectFoam()
             self.generateFoam()
-            self.collect_pos_for_vis()
 
         self.draw_classifiedFrom()
