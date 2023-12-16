@@ -311,10 +311,10 @@ class Foam():
     def update_limits(self,):
         max_v, max_c, max_o, max_e = -math.inf, -math.inf, -math.inf, -math.inf
         for p_i in self.positions:
-            max_v = max_v if max_v > self.v_diff[p_i] else self.v_diff[p_i]
-            max_c = max_c if max_c > self.curvature[p_i] else self.curvature[p_i]
-            max_o = max_o if max_o > self.omega_diff[p_i] else self.omega_diff[p_i]
-            max_e = max_e if max_e > self.energy[p_i] else self.energy[p_i]
+            ti.atomic_max(max_v, self.v_diff[p_i])
+            ti.atomic_max(max_c, self.curvature[p_i])
+            ti.atomic_max(max_o, self.omega_diff[p_i])
+            ti.atomic_max(max_e, self.energy[p_i])
 
         ti.atomic_add(self.sum_max_vdiff[None], max_v)
         ti.atomic_add(self.sum_max_curvature[None], max_c)
