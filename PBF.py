@@ -24,8 +24,8 @@ class Pbf():
 
         # config particles
         self.dim = 3 # 3d pbf
-        self.num_particles_x = 10 * self.k
-        self.num_particles_y = 10 * self.k
+        self.num_particles_x = 15 * self.k
+        self.num_particles_y = 15 * self.k
         self.num_particles_z = 10 * self.k
         self.num_particles = self.num_particles_x * self.num_particles_y * self.num_particles_z
         self.max_num_particles_per_cell = 100 # 3d
@@ -115,7 +115,7 @@ class Pbf():
             z = (i % (self.num_particles_x*self.num_particles_z)) // self.num_particles_x
             delta = self.h_ * 0.8
             offs = ti.Vector([(self.boundary[0] - delta * self.num_particles_x) * 0.95, 0, self.boundary[2] * 0.02]) # self.boundary[1] * 0.02
-            self.positions[i] = ti.Vector([x, z, y]) * delta + offs
+            self.positions[i] = ti.Vector([x, y, z]) * delta + offs
             for c in ti.static(range(self.dim)):
                 self.velocities[i][c] = (ti.random() - 0.5) * 4
         self.board_states[None] = ti.Vector([self.boundary[0] - self.epsilon, -0.0])
