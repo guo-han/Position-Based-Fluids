@@ -127,7 +127,7 @@ class Pbf():
         b = self.board_states[None]
         b[1] += 1.0
         period = 250
-        vel_strength = 8.0 + 2*self.k
+        vel_strength = 8.0 + 1*self.k
         if b[1] >= 2 * period:
             b[1] = 0
         b[0] += -ti.sin(b[1] * np.pi / period) * vel_strength * self.time_delta

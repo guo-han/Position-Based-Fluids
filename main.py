@@ -107,6 +107,8 @@ def main():
     # side view
     camera.position(fluid.boundary[0]/2, fluid.boundary[1]/2, 40 * k)
     camera.lookat(fluid.boundary[0]/2, fluid.boundary[1]/4, 0)
+    # camera.position(-fluid.boundary[0]/2, fluid.boundary[1]/4, fluid.boundary[2]/2)
+    # camera.lookat(0, fluid.boundary[1]/4, fluid.boundary[2]/2)
     camera.up(0, 1, 0)
     camera.projection_mode(ti.ui.ProjectionMode.Perspective)
 
