@@ -4,15 +4,15 @@ import numpy as np
 import taichi as ti
 from PBF import Pbf
 from FOAM import Foam
-from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line, convert_foam_info_to_json
-from utils import convert_rigid_info_to_json, convert_foam_info_to_pcd
+from utils import PROJ_PATH, convert_particle_info_to_json, convert_json_to_mesh_command_line
+from utils import convert_rigid_info_to_json, convert_foam_info_to_pcd, convert_spary_info_to_pcd
 from StaticRigidBody import StaticRigidBody
 from rb_config import *
 
 # scale factor
 k = 3
 # config rendering
-ti.init(arch=ti.gpu)  # , debug=True
+ti.init()  # , debug=True
 screen_res = (800, 400)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
@@ -75,10 +75,15 @@ def bake(frame, bake_foam = False,start=150, end=160):
         filename = f"frame_{frame:05d}"
         pos_np = fluid.positions.to_numpy()
         # pos_np = pos_np[:, (0, 2, 1)] # why???
-        foam_np = foam.all_foam_pos.to_numpy()
+        # foam_np = foam.all_foam_pos.to_numpy()
+        foam_np = foam.white_particles.to_numpy()
+        bubble_np = foam.red_particles.to_numpy()
+        spray_np = foam.green_particles.to_numpy()
+        foam_np = np.concatenate((foam_np, bubble_np), axis=0)
         convert_particle_info_to_json(pos_np, filename)
         convert_json_to_mesh_command_line(filename)
         convert_foam_info_to_pcd(foam_np, filename)
+        convert_spary_info_to_pcd(spray_np, filename)
 
 def run():
     fluid.move_board()
@@ -124,7 +129,7 @@ def main():
 
     frame = 0
     start = True
-    bake_mesh = False
+    bake_mesh = True
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break
@@ -132,7 +137,7 @@ def main():
         if start:
             run()
             if bake_mesh:
-                bake(frame, bake_foam=True)
+                bake(frame, True, 240, 250)
             frame += 1
         # rendering
         render(window, scene, canvas, camera)
