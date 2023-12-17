@@ -8,7 +8,7 @@ class Pbf():
         # scale factor
         self.k = k  # control self.boundry, num_particles_xyz and move board velocity strength
         # config fulid grid
-        grid_res = (300, 200, 100)
+        grid_res = (300, 140, 100)
         screen_to_world_ratio = 10.0
         self.boundary = (
             grid_res[0] / screen_to_world_ratio * k,

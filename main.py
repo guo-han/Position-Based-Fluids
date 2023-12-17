@@ -124,7 +124,7 @@ def main():
 
     frame = 0
     start = True
-    bake_mesh = False
+    bake_mesh = True
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break

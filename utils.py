@@ -20,7 +20,7 @@ os.makedirs(os.path.join(PROJ_PATH, FOAM_PCD_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, RENDER_dir),exist_ok=True)
 
 def convert_json_to_mesh_command_line(filename, 
-                                      particle_radius=0.8,
+                                      particle_radius=0.5,
                                       smoothing_length=2.0,
                                       cube_size=0.5,
                                       surface_threshold=0.6

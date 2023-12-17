@@ -387,8 +387,8 @@ class Foam():
                 local_particle = self.particle_to_foam_grid[iidx, jidx]
                 if local_particle.get_type() == 1:  # check whether it is foam/bubble
                     self.particle_to_foam_grid[iidx, jidx].lifetime -= self.timeStepSize
-                if local_particle.get_type() == 2:  # check whether it is foam/bubble
-                    self.particle_to_foam_grid[iidx, jidx].lifetime -= 0.5*self.timeStepSize
+                # if local_particle.get_type() == 2:  # check whether it is foam/bubble
+                #     self.particle_to_foam_grid[iidx, jidx].lifetime -= 0.5*self.timeStepSize
                 if self.particle_to_foam_grid[iidx, jidx].lifetime > self.epsilon:
                     localp, localv, locall, localt = self.particle_to_foam_grid[iidx, jidx].get_pvlt()
                     self.particle_to_foam_grid[iidx, local_counter].set_pvlt(localp, localv, locall, localt)
