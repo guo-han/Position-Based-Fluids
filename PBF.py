@@ -30,7 +30,7 @@ class Pbf():
         self.num_particles = self.num_particles_x * self.num_particles_y * self.num_particles_z
         self.max_num_particles_per_cell = 100 # 3d
         self.max_num_neighbors = 100 # 3d
-        self.time_delta = 1.0 / 60.0
+        self.time_delta = 1.0 / 60.0 
         self.epsilon = 1e-5
         particle_radius = 3.0
         self.particle_radius_in_world = particle_radius / screen_to_world_ratio
@@ -126,8 +126,8 @@ class Pbf():
         # probably more accurate to exert force on particles according to hooke's law.
         b = self.board_states[None]
         b[1] += 1.0
-        period = 250
-        vel_strength = 8.0 + 1*self.k
+        period = 200
+        vel_strength = 6.0 + 2*self.k
         if b[1] >= 2 * period:
             b[1] = 0
         b[0] += -ti.sin(b[1] * np.pi / period) * vel_strength * self.time_delta
