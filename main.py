@@ -12,8 +12,7 @@ from rb_config import *
 # scale factor
 k = 3
 # config rendering
-# ti.init(arch=ti.gpu) # , debug=True
-ti.init()
+ti.init(arch=ti.gpu)  # , debug=True
 screen_res = (800, 400)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
@@ -48,7 +47,7 @@ def render(window, scene, canvas, camera):
     
     scene.lines(points_pos, color = (0.28, 0.68, 0.99), width = 10.0)
     scene.particles(fluid.positions, color = particle_color, radius = 0.1, per_vertex_color = fluid.particle_colors)
-    # scene.particles(foam.foam_positions, color = foam_color, radius = 0.1)
+    # scene.particles(foam.all_foam_pos, color = foam_color, radius = 0.1)
     scene.particles(foam.white_particles, color = foam_color, radius = 0.1)
     scene.particles(foam.red_particles, color = red_color, radius = 0.1)
     scene.particles(foam.green_particles, color = green_color, radius = 0.1)
@@ -76,7 +75,7 @@ def bake(frame, bake_foam = False,start=150, end=160):
         filename = f"frame_{frame:05d}"
         pos_np = fluid.positions.to_numpy()
         # pos_np = pos_np[:, (0, 2, 1)] # why???
-        foam_np = foam.foam_positions.to_numpy()
+        foam_np = foam.all_foam_pos.to_numpy()
         convert_particle_info_to_json(pos_np, filename)
         convert_json_to_mesh_command_line(filename)
         convert_foam_info_to_pcd(foam_np, filename)
