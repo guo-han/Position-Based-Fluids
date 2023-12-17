@@ -124,7 +124,7 @@ class Foam():
         self.k_ta = 1
         self.k_wc = 1
         self.k_vo = 1
-        self.n = 10000
+        self.n = 1000
         self.k_buoyancy = 2.0
         self.k_drag = 0.8
         self.lifetimeMin = 2.0
@@ -314,14 +314,20 @@ class Foam():
         ti.atomic_add(self.frame_num[None], 1)
 
         # compute limits
-        self.taMax[None] = self.sum_max_vdiff[None] / self.frame_num[None]
-        self.taMin[None] = 0. * self.taMax[None]
-        self.wcMax[None] = self.sum_max_curvature[None] / self.frame_num[None]
-        self.wcMin[None] = 0. * self.wcMax[None]
-        self.voMax[None] = self.sum_max_omega[None] / self.frame_num[None]
-        self.voMin[None] = 0. * self.voMax[None]
-        self.keMax[None] = self.sum_max_energy[None] / self.frame_num[None]
-        self.keMin[None] = 0. * self.keMax[None]
+        self.taMax[None] = 28 # self.sum_max_vdiff[None] / self.frame_num[None]
+        self.taMin[None] = 0.1 * self.taMax[None]
+        self.wcMax[None] = 3.6 # self.sum_max_curvature[None] / self.frame_num[None]
+        self.wcMin[None] = 0.1 * self.wcMax[None]
+        self.voMax[None] = 130 # self.sum_max_omega[None] / self.frame_num[None]
+        self.voMin[None] = 0.1 * self.voMax[None]
+        self.keMax[None] = 2900 # self.sum_max_energy[None] / self.frame_num[None]
+        self.keMin[None] = 0.1 * self.keMax[None]
+
+        # if (self.frame_num[None] % 100 == 99):
+        #     print(f"Trapped Air: min({self.taMin[None]}) max({self.taMax[None]})")
+        #     print(f"Wave Crest: min({self.wcMin[None]}) max({self.wcMax[None]})")
+        #     print(f"Vorticity: min({self.voMin[None]}) max({self.voMax[None]})")
+        #     print(f"Kinematic Energy: min({self.keMin[None]}) max({self.keMax[None]})")
 
     @ti.func
     def getOrthogonalVectors(self, vec):
@@ -379,8 +385,10 @@ class Foam():
             local_counter = 0
             for jidx in range(self.particle_to_foam_counter[iidx]):
                 local_particle = self.particle_to_foam_grid[iidx, jidx]
-                if local_particle.get_type() > 0:  # check whether it is foam/bubble
+                if local_particle.get_type() == 1:  # check whether it is foam/bubble
                     self.particle_to_foam_grid[iidx, jidx].lifetime -= self.timeStepSize
+                if local_particle.get_type() == 2:  # check whether it is foam/bubble
+                    self.particle_to_foam_grid[iidx, jidx].lifetime -= 0.5*self.timeStepSize
                 if self.particle_to_foam_grid[iidx, jidx].lifetime > self.epsilon:
                     localp, localv, locall, localt = self.particle_to_foam_grid[iidx, jidx].get_pvlt()
                     self.particle_to_foam_grid[iidx, local_counter].set_pvlt(localp, localv, locall, localt)
@@ -404,6 +412,7 @@ class Foam():
             self.curvature[p_i] = 0.0
             self.omega_diff[p_i] = 0.0
             self.energy[p_i] = 0.0
+            factor = self.mass / self.densities[p_i]
 
             for j in range(self.particle_num_neighbors[p_i]):
                 p_j = self.particle_neighbors[p_i, j]
@@ -423,14 +432,14 @@ class Foam():
                 Wrs = self.foam_W(mag_pos)
 
                 # Trapped Air Potential
-                self.v_diff[p_i] += mag_vel * (1 - nvel_ji.dot(npos_ji)) * Wrs
+                self.v_diff[p_i] += mag_vel * (1 - nvel_ji.dot(npos_ji)) * Wrs * factor
 
                 # Wave Crest Curvature
                 if (-npos_ji.dot(ni) < 0):
-                    self.curvature[p_i] += (1 - ni.dot(nj)) * Wrs
+                    self.curvature[p_i] += (1 - ni.dot(nj)) * Wrs * factor
 
                 # vorticity
-                self.omega_diff[p_i] += (self.omegas[p_i] - self.omegas[p_j]).norm() * Wrs
+                self.omega_diff[p_i] += (self.omegas[p_i] - self.omegas[p_j]).norm() * Wrs * factor
 
             delta = 0.0
             nvel_i = vel_i.normalized() if vel_i.norm() > self.epsilon else vel_i
@@ -477,7 +486,7 @@ class Foam():
                 # spray
                 if nb_i < 6: self.particle_to_foam_grid[iidx, jidx].set_type(0)
                 # bubble
-                if nb_i > 15: self.particle_to_foam_grid[iidx, jidx].set_type(2)
+                if nb_i > 16: self.particle_to_foam_grid[iidx, jidx].set_type(2)
 
     @ti.kernel
     def advectFoam(self,):
@@ -510,7 +519,7 @@ class Foam():
                     if (type == 1):
                         pos_ij += self.timeStepSize * vf
                     elif (type == 2):
-                        vel_ij += self.k_drag*(vf-vel_ij) - self.timeStepSize*self.k_buoyancy*self.g
+                        vel_ij += self.k_drag*(vf-vel_ij) - self.timeStepSize*self.k_buoyancy*self.g + ti.Vector([0., 2., 0.])
                         pos_ij += self.timeStepSize * vel_ij
                 
                 pos_ij, vel_ij = self.confine_position_to_boundary(pos_ij, vel_ij)
