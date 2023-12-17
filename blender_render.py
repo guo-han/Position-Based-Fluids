@@ -7,24 +7,24 @@ import logging
 import json
 import colorsys
 from math import sin, cos, pi
-from tqdm import tqdm
 import glob
 from rb_config import *
 TAU = 2*pi
+from utils import PROJ_PATH
 
 def main():
-    dir_mesh = './meshes/'
-    dir_rendering = './rendering/'
-    dir_particles = './particles/'
-    dir_foam_pcd = './foam_pcd/'
-    dir_spray_pcd = './spray_pcd/'
-    path_envmap= './textures/Skies-001.jpg'
-    dir_bunny = './data/models/bunny_final.obj'
-    path_box = './Assets/box.obj'
-    path_curve = './Assets/plane.obj'
-    path_lights = './Assets/lights.obj'
+    dir_mesh = os.path.join(PROJ_PATH, 'meshes')
+    dir_rendering = os.path.join(PROJ_PATH, 'rendering')
+    dir_particles = os.path.join(PROJ_PATH, 'particles')
+    dir_foam_pcd = os.path.join(PROJ_PATH, 'foam_pcd')
+    dir_spray_pcd = os.path.join(PROJ_PATH, 'spray_pcd')
+    path_envmap= os.path.join(PROJ_PATH, 'textures', 'Skies-001.jpg')
+    dir_bunny = os.path.join(PROJ_PATH, 'data', 'models', 'bunny_final.obj')
+    path_box = os.path.join(PROJ_PATH, 'Assets', 'box.obj')
+    path_curve = os.path.join(PROJ_PATH, 'Assets', 'plane.obj')
+    path_lights = os.path.join(PROJ_PATH, 'Assets', 'lights.obj')
 
-    path_video = "./rendering/test.avi"
+    path_video = os.path.join(PROJ_PATH, 'rendering', 'test.avi')
     obj_name_list = sorted(glob.glob(os.path.join(dir_mesh, "*.obj")))
     foam_pcd_name_list = sorted(glob.glob(os.path.join(dir_foam_pcd, "*.ply")))
     spray_pcd_name_list = sorted(glob.glob(os.path.join(dir_spray_pcd, "*.ply")))
@@ -44,17 +44,17 @@ def main():
     for idx, obj_name in enumerate(obj_name_list):
         # extract fluid mesh name without extension
         fileName = os.path.splitext(obj_name)[0]
-        fileName = fileName.split("/")[-1]
+        fileName = fileName.split("/")[-1] if "/" in fileName else fileName.split("\\")[-1]
         obj_name_list_wo_ext.append(fileName)
         # extract foam ply name without extension
         pcdName = os.path.splitext(foam_pcd_name_list[idx])[0]
-        pcdName = pcdName.split("/")[-1]
+        pcdName = pcdName.split("/")[-1] if "/" in pcdName else pcdName.split("\\")[-1]
         foam_pcd_name_list_wo_ext.append(pcdName)
         # extract spray ply name without extension
         pcdName = os.path.splitext(spray_pcd_name_list[idx])[0]
-        pcdName = pcdName.split("/")[-1]
+        pcdName = pcdName.split("/")[-1] if "/" in pcdName else pcdName.split("\\")[-1]
         spray_pcd_name_list_wo_ext.append(pcdName)
-        render_img_path.append(dir_rendering+fileName+"_render.png")
+        render_img_path.append(os.path.join(dir_rendering, fileName+"_render.png"))
 
 
     # Remove all elements
@@ -196,7 +196,7 @@ def main():
     scene.render.resolution_y = 1080
     scene.render.resolution_percentage = 50
     scene.render.engine = 'CYCLES'
-    scene.cycles.device = 'CPU'
+    scene.cycles.device = 'GPU'
     bpy.context.scene.cycles.samples = 128
 
     # set background image

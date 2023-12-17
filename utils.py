@@ -14,7 +14,6 @@ SPARY_PCD_dir = "spray_pcd"
 RENDER_dir = "rendering"
 os.makedirs(os.path.join(PROJ_PATH, PARTICLE_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, SPARY_PCD_dir),exist_ok=True)
-os.makedirs(os.path.join(PROJ_PATH, RIGID_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, MESH_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, FOAM_PCD_dir),exist_ok=True)
 os.makedirs(os.path.join(PROJ_PATH, RENDER_dir),exist_ok=True)
