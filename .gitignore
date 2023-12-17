@@ -9,3 +9,4 @@ reconstruct.py
 /foam_meshes
 /foam_pcd
 /spray_pcd
+.DS_Store
