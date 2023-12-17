@@ -8,28 +8,29 @@ import json
 import colorsys
 from math import sin, cos, pi
 from tqdm import tqdm
+from rb_config import *
 TAU = 2*pi
 
 def main():
     dir_mesh = './meshes/'
     dir_rendering = './rendering/'
     dir_particles = './particles/'
-    dir_foam = './foam/'
+    # dir_foam = './foam/'
     dir_foam_pcd = './foam_pcd/'
-    dir_rigid = './rigids/'
+    # dir_rigid = './rigids/'
     path_envmap= './textures/Skies-001.jpg'
-    dir_rock = './data/models/Rock_9.obj'
+    dir_bunny = './data/models/bunny_final.obj'
 
     path_video = "./rendering/test.avi"
     obj_name_list = sorted(os.listdir(dir_mesh))
-    foam_name_list = sorted(os.listdir(dir_foam))
-    rigid_name_list = sorted(os.listdir(dir_rigid))
+    # foam_name_list = sorted(os.listdir(dir_foam))
+    # rigid_name_list = sorted(os.listdir(dir_rigid))
     foam_pcd_name_list = sorted(os.listdir(dir_foam_pcd))
     obj_list_num = len(obj_name_list)
     # obj_path = dir_path+obj_name+".obj"
     obj_path_list = [dir_mesh+obj_name for obj_name in obj_name_list]
-    foam_path_list = [dir_foam + foam_name for foam_name in foam_name_list]
-    rigid_path_list = [dir_rigid + rigid_name for rigid_name in rigid_name_list]
+    # foam_path_list = [dir_foam + foam_name for foam_name in foam_name_list]
+    # rigid_path_list = [dir_rigid + rigid_name for rigid_name in rigid_name_list]
     foam_pcd_path_list = [dir_foam_pcd + foam_pcd_name for foam_pcd_name in foam_pcd_name_list]
     # render_img_path = dir_path+obj_name+"_render_total.png"
     render_img_path = []
@@ -158,7 +159,7 @@ def main():
     
     # for i in range()
 
-    for i in range(obj_list_num):
+    for i in range(1):
         # load foam point cloud
         bpy.ops.import_mesh.ply(filepath = foam_pcd_path_list[i])
         foam_name = foam_pcd_name_list_wo_ext[i]
@@ -179,7 +180,7 @@ def main():
         set_material = geo.nodes["Set Material"]
         set_material.inputs[2].default_value = bpy.data.materials["FoamMaterial"]
         mtp_out = geo.nodes["Mesh to Points"].outputs[0]
-        geo.nodes["Mesh to Points"].inputs[3].default_value = 0.05
+        geo.nodes["Mesh to Points"].inputs[3].default_value = 1
         print(mtp_out)
         mtp_in = geo.nodes["Mesh to Points"].inputs[0]
         print(mtp_in)
@@ -201,18 +202,19 @@ def main():
         rigid_all = []
         if i==0:
             # load rigid
-            with open(rigid_path_list[0], 'r') as load_rigid:
-                rigid_dict = json.load(load_rigid)
-            scalings = rigid_dict['scalings']
-            rigid_pos = rigid_dict['pos']
-            rigid_center = rigid_dict['center']
-            bpy.ops.import_scene.obj(filepath=dir_rock)
-            rigid = bpy.data.objects['Rock_9']
+            # with open(rigid_path_list[0], 'r') as load_rigid:
+            #     rigid_dict = json.load(load_rigid)
+            # scalings = rigid_dict['scalings']
+            # rigid_pos = rigid_dict['pos']
+            # rigid_center = rigid_dict['center']
+            bpy.ops.import_scene.obj(filepath=rabbit_config_dict['model_path'])
+            rigid = bpy.data.objects[rabbit_config_dict['model_name']]
             rigid_all.append(rigid)
+            scalings = rabbit_config_dict['model_scale']
             bpy.ops.transform.resize(value=(scale_ratio[0]*scalings, scale_ratio[1]*scalings, scale_ratio[2]*scalings))
-            rigid.location = ((rigid_pos[0]  - rigid_center[0]*scalings) * scale_ratio[0], 
-                            (-rigid_pos[2] - rigid_center[2]*scalings) * scale_ratio[2],
-                            (rigid_pos[1] - rigid_center[1]*scalings * scale_ratio[1]))
+            # rigid.location = ((rigid_pos[0]  - rigid_center[0]*scalings) * scale_ratio[0], 
+            #                 (-rigid_pos[2] - rigid_center[2]*scalings) * scale_ratio[2],
+            #                 (rigid_pos[1] - rigid_center[1]*scalings * scale_ratio[1]))
             
             rigid.data.materials.clear()
             rigid.data.materials.append(bpy.data.materials["RigidMaterial"])

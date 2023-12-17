@@ -78,7 +78,6 @@ def bake(frame, bake_foam = False,start=150, end=160):
         # pos_np = pos_np[:, (0, 2, 1)] # why???
         foam_np = foam.foam_positions.to_numpy()
         convert_particle_info_to_json(pos_np, filename)
-        convert_foam_info_to_json(foam_np, filename)
         convert_json_to_mesh_command_line(filename)
         convert_foam_info_to_pcd(foam_np, filename)
 
