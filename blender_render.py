@@ -8,7 +8,7 @@ import json
 import colorsys
 from math import sin, cos, pi
 import glob
-from rb_config import *
+from rb_config import rabbit_render_config_dict as rabbit_config_dict
 TAU = 2*pi
 from utils import PROJ_PATH
 
@@ -201,7 +201,6 @@ def main():
     links = scene.world.node_tree.links
     link = links.new(node_environment.outputs["Color"], node_background.inputs["Color"])
     link = links.new(node_background.outputs["Background"], node_output.inputs["Surface"])
-
 
     # importing objects
     # load bunny
