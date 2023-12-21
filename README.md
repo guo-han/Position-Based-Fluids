@@ -23,9 +23,9 @@
 ## Presentation Video
 
 ## Environment Setup
-To run the real time simulation, you need to install <a herf="https://www.taichi-lang.org/">Taichi</a> and <a herf="http://www.open3d.org/">Open3d</a>. The python version we use is 3.10.13.
+To run the real time simulation, you need to install <a href="https://www.taichi-lang.org/">Taichi</a> and <a href="http://www.open3d.org/">Open3d</a>. The python version we use is 3.10.13, the taichi version we use is taichi==1.6.0, the Open3d version we use is open3d==0.17.0.
 
-To run the rendering, you need to install <a herf="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a herf="https://www.blender.org/">Blender python API </a>
+To run the rendering, you need to install <a href="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a href="https://www.blender.org/">Blender python API </a>
 ## Code Usage
 ### Real-time Simulation
 The real-time simulation provides a Taichi GGUI interface for visualization. You'll witness a dynamic scene featuring a board in motion, creating ripples as it sways back and forth while various diffuse particles (green: spray; white: foam; red: bubble) are dynamically generated. Amidst this aquatic environment, a stationary bunny stands amidst the flowing water.
