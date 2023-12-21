@@ -13,7 +13,7 @@ from rb_config import *
 k = 3
 # config rendering
 ti.init(arch=ti.gpu)  # , debug=True
-screen_res = (800, 400)
+screen_res = (1600, 800)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
 foam_color = (1,1,1)
@@ -129,7 +129,7 @@ def main():
 
     frame = 0
     start = True
-    bake_mesh = True
+    bake_mesh = False
     while window.running:
         if window.get_event(ti.ui.PRESS):
             if window.event.key in [ti.ui.ESCAPE]: break

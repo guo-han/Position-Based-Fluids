@@ -24,11 +24,11 @@ class Pbf():
 
         # config particles
         self.dim = 3 # 3d pbf
-        self.num_particles_x = 15 * self.k
+        self.num_particles_x = 14 * self.k
         self.num_particles_y = 15 * self.k
         self.num_particles_z = 10 * self.k
         self.num_particles = self.num_particles_x * self.num_particles_y * self.num_particles_z
-        self.max_num_particles_per_cell = 100 # 3d
+        self.max_num_particles_per_cell = 100 # 3d  # TODO: assert this setting
         self.max_num_neighbors = 100 # 3d
         self.time_delta = 1.0 / 60.0 
         self.epsilon = 1e-5
@@ -98,6 +98,9 @@ class Pbf():
         self.colors = np.tile(
             np.array([6.0/255.0,133.0/255.0,135.0/255.0], dtype=np.float32), (self.num_particles, 1)
         )
+        # self.colors = np.tile(
+        #     np.array([1.0, 1.0, 1.0], dtype=np.float32), (self.num_particles, 1)
+        # )
 
         self.reset_color()
 
@@ -225,18 +228,23 @@ class Pbf():
         # update grid
         for I in ti.grouped(self.grid_num_particles):
             self.grid_num_particles[I] = 0
+        # if True:
         for p_i in self.positions:
             cell = self.get_cell(self.positions[p_i])
             # ti.Vector doesn't seem to support unpacking yet
             # but we can directly use int Vectors as indices
             offs = ti.atomic_add(self.grid_num_particles[cell], 1)
+            assert(offs < self.max_num_particles_per_cell)
             self.grid2particles[cell, offs] = p_i
+            # if cell[0] == 25 and cell[1] == 0 and cell[2] == 1:
+                # print("offs larger than per cell, ", self.grid_num_particles[cell] - 1, ", cell: ", cell, " positions: ", self.positions[p_i])
 
     @ti.kernel
     def collect_set_of_potential_collided_particles(self):
         self.rb_particle_collision_num[None] = 0
         counter = 0
-        for _ in range(1):    # To serialize loop 
+        # if True:    # To serialize loop 
+        for _ in range(1):
             for I in range(self.rb.grid_AABB.shape[0]): 
                 grid_idx = self.rb.grid_AABB[I]
                 self.collect_set_of_potential_collided_particles_ti_v(grid_idx, counter)
@@ -249,7 +257,7 @@ class Pbf():
         for i in range(self.confirmed_rb_particle_collision_num[None]):
             idx = self.sdf_negative_indices[i]
             p_idx = self.rb_particle_collision_idx_set[idx]
-            self.particle_colors[p_idx] = [0.0, 1.0, 0.0]   # TODO: change the specification format latter
+            # self.particle_colors[p_idx] = [0.0, 0.0, 0.0]   # TODO: change the specification format latter
             dis_values = self.sdf_negatives[i]
             # if dis_values < self.rb_fp_collision_sdf_lower_bound:
                 # dis_values = self.rb_fp_collision_sdf_lower_bound
@@ -266,7 +274,7 @@ class Pbf():
         self.collect_set_of_potential_collided_particles()
         # Visualization, TODO: comment later
         self.reset_color()
-        self.color_potential_particles()
+        # self.color_potential_particles()
         if self.rb_particle_collision_num[None] == 0:
             return
         potential_positions = self.rb_particle_collision_set.to_numpy()[:self.rb_particle_collision_num[None]]
