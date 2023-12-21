@@ -28,7 +28,7 @@ To run the real time simulation, you need to install <a href="https://www.taichi
 To run the rendering, you need to install <a href="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a href="https://www.blender.org/">Blender python API </a>
 ## Code Usage
 ### Real-time Simulation
-The real-time simulation provides a Taichi GGUI interface for visualization. You'll witness a dynamic scene featuring a board in motion, creating ripples as it sways back and forth while various diffuse particles (green: spray; white: foam; red: bubble) are dynamically generated. Amidst this aquatic environment, a stationary bunny stands in the flowing water.
+In this project, we built from scratch a Real-time Position-based Fluid Simulation pipeling, with advanced features like: static rigid body collision and white particles generation (foam, spray and bubbles). It is fully developed with TaiChi language and provides a GGUI interface for visualization. We also provide scripts to export the particle-based simulation results into mesh, and render the final scene with Blender Python APIs.
 
 The simulation process can run at 25+FPS on RTX 3070 GPU.
 
@@ -50,8 +50,10 @@ Afterward, execute `python blender_render.py` to commence image rendering. Pleas
 
 [2] Ihmsen, Markus, et al. "Unified spray, foam and air bubbles for particle-based fluids." The Visual Computer 28 (2012): 669-677.
 
-[3] Taichi Blog for Collision Handling: https://docs.taichi-lang.org/blog/acclerate-collision-detection-with-taichi
+[3] J. Bender, D. Koschier, T. Kugelstadt and M. Weiler, "Turbulent Micropolar SPH Fluids with Foam," in IEEE Transactions on Visualization and Computer Graphics, vol. 25, no. 6, pp. 2284-2295, 1 June 2019, doi: 10.1109/TVCG.2018.2832080.
 
-[4] Taichi PBF 2D Example by Ye Kuang: https://github.com/taichi-dev/taichi/blob/master/python/taichi/examples/simulation/pbf2d.py 
+[4] Taichi Blog for Collision Handling: https://docs.taichi-lang.org/blog/acclerate-collision-detection-with-taichi
 
-[5] SPlisHSPlasH Library for Diffuse Particles Synthesis: https://github.com/InteractiveComputerGraphics/SPlisHSPlasH 
+[5] Taichi PBF 2D Example by Ye Kuang: https://github.com/taichi-dev/taichi/blob/master/python/taichi/examples/simulation/pbf2d.py 
+
+[6] SPlisHSPlasH Library for Diffuse Particles Synthesis: https://github.com/InteractiveComputerGraphics/SPlisHSPlasH 

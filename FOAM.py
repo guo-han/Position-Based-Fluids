@@ -1,9 +1,5 @@
-import os
 import math
-import numpy as np
 import taichi as ti
-from PBF import Pbf
-from utils import PROJ_PATH, MESH_dir, read_obj
 
 @ti.func
 def clamp(x, tmin, tmax):
@@ -97,8 +93,9 @@ class FoamParticle:
 @ti.data_oriented
 class Foam():
     def __init__(self, fluid) -> None:
+        # inherit from fluid
         self.fluid = fluid
-        self.dim = fluid.dim
+        self.dim = fluid.dim # should always be 3
         self.r_ = fluid.particle_radius_in_world
         self.h_ = fluid.h_
         self.h3 = pow(self.h_, 3)
@@ -112,18 +109,18 @@ class Foam():
         self.particle_num_neighbors = fluid.particle_num_neighbors
         self.particle_neighbors = fluid.particle_neighbors
         self.epsilon = 1.0e-9
+        self.g = fluid.g
+        self.timeStepSize = fluid.time_delta
         
         # foam
-        self.g = fluid.g
         self.m_k = 8.0 / (math.pi * self.h3)
         self.m_l = 48.0 / (math.pi * self.h3)
         self.inertia = 2.0
         self.foam_scale = 1
-        self.timeStepSize = fluid.time_delta
         self.k_ta = 1
         self.k_wc = 1
         self.k_vo = 1
-        self.n = 1000
+        self.n = 1000 # controlling the maximum num of foams that can be generated each frame
         self.k_buoyancy = 2.0
         self.k_drag = 0.8
         self.lifetimeMin = 2.0
@@ -140,9 +137,9 @@ class Foam():
         self.init()   # TODO: check whether it is reasonable
         self.particle_to_foam_to_neighbor_grid = ti.field(int, shape = (num_particles, self.max_foam_per_particle, self.fluid.max_num_neighbors))
         self.particle_to_foam_to_neighbor_count = ti.field(int, shape = (num_particles, self.max_foam_per_particle, ))      
-        #  ###############
+        #  #############################################
         #  foam_type: spray -> 0, foam -> 1, bubbles -> 2
-        #  ###############
+        #  #############################################
 
         # potentials
         self.v_diff = ti.field(float)
@@ -160,12 +157,6 @@ class Foam():
         self.max_num_neighbors = fluid.max_num_neighbors
         self.grid_num_particles = fluid.grid_num_particles
         self.grid2particles = fluid.grid2particles
-        # self.foam_num_neighbors = ti.field(int)
-        # self.foam_neighbors = ti.field(int)
-
-        # nb_node = ti.root.dense(ti.i, self.max_num_white_particles)
-        # nb_node.place(self.foam_num_neighbors)
-        # nb_node.dense(ti.j, self.max_num_neighbors).place(self.foam_neighbors)
 
         # accumulate values
         self.frame_num = ti.field(ti.i32, shape=())
@@ -238,8 +229,8 @@ class Foam():
             ni = ti.Vector([0., 0., 0.])
             self.yellow_particles[p_i] = ti.Vector([0., 0., 0.])
 
-            # only interested in surface particles, may need a smaller threshold...
-            if self.particle_num_neighbors[p_i] > 16: # 10/11??
+            # only interested in surface particles
+            if self.particle_num_neighbors[p_i] > 16:
                 continue
 
             self.yellow_particles[p_i] = pos_i
@@ -299,6 +290,7 @@ class Foam():
 
     @ti.func
     def update_limits(self,):
+        # followed paper: Bender et al., "Turbulent Micropolar SPH Fluids with Foam", 2018 
         max_v, max_c, max_o, max_e = -math.inf, -math.inf, -math.inf, -math.inf
         for p_i in self.positions:
             ti.atomic_max(max_v, self.v_diff[p_i])
@@ -313,6 +305,7 @@ class Foam():
         ti.atomic_add(self.frame_num[None], 1)
 
         # compute limits
+        # NOTE: Here we fixed the limit values for a stable result in our bunny scene.
         self.taMax[None] = 28 # self.sum_max_vdiff[None] / self.frame_num[None]
         self.taMin[None] = 0.1 * self.taMax[None]
         self.wcMax[None] = 3.6 # self.sum_max_curvature[None] / self.frame_num[None]
@@ -322,6 +315,7 @@ class Foam():
         self.keMax[None] = 2900 # self.sum_max_energy[None] / self.frame_num[None]
         self.keMin[None] = 0.1 * self.keMax[None]
 
+        # DEBUG log:
         # if (self.frame_num[None] % 100 == 99):
         #     print(f"Trapped Air: min({self.taMin[None]}) max({self.taMax[None]})")
         #     print(f"Wave Crest: min({self.wcMin[None]}) max({self.wcMax[None]})")
@@ -451,7 +445,7 @@ class Foam():
 
         self.update_limits()
 
-        # FOR LOG: compute the sum and max for all vaues
+        # DEBUG log: compute the sum and max for all vaues
         # sum_vdiff = ti.sum(self.v_diff)
         # sum_curvature = ti.sum(self.curvature)
         # sum_energy = ti.sum(self.energy)
