@@ -29,6 +29,8 @@
 The real-time simulation provides a Taichi GGUI interface for visualization. You'll witness a dynamic scene featuring a board in motion, creating ripples as it sways back and forth while various diffuse particles (green: spray; white: foam; red: bubble) are dynamically generated. Amidst this aquatic environment, a stationary bunny stands amidst the flowing water.
 
 The simulation process can run at 25+FPS on RTX 3070 GPU.
+
+If your computer does not have a GPU, please change line 15 of `main.py` to `ti.init()`
 ```
 python main.py
 ```

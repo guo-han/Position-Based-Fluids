@@ -28,7 +28,7 @@ class Pbf():
         self.num_particles_y = 15 * self.k
         self.num_particles_z = 10 * self.k
         self.num_particles = self.num_particles_x * self.num_particles_y * self.num_particles_z
-        self.max_num_particles_per_cell = 100 # 3d  # TODO: assert this setting
+        self.max_num_particles_per_cell = 100 # 3d
         self.max_num_neighbors = 100 # 3d
         self.time_delta = 1.0 / 60.0 
         self.epsilon = 1e-5
@@ -44,8 +44,6 @@ class Pbf():
         self.corr_deltaQ_coeff = 0.2
         self.corrK = 0.01
         self.g = ti.Vector([0.0, -9.8, 0.0])
-        # Need ti.pow()
-        # corrN = 4.0
         self.neighbor_radius = self.h_ * 1.05
 
         self.poly6_factor = 315.0 / 64.0 / math.pi
@@ -67,8 +65,7 @@ class Pbf():
         # 0: x-pos, 1: timestep in sin()
         self.board_states = ti.Vector.field(2, float)
 
-        self.rb_fp_collision_stiffness = 500    # TODO: check this setting
-        # self.rb_fp_collision_sdf_lower_bound = -0.1
+        self.rb_fp_collision_stiffness = 500
         self.forces = ti.Vector.field(self.dim, float)
         self.rb = None
         self.rb_particle_collision_set = ti.Vector.field(self.dim, float)
@@ -98,9 +95,6 @@ class Pbf():
         self.colors = np.tile(
             np.array([6.0/255.0,133.0/255.0,135.0/255.0], dtype=np.float32), (self.num_particles, 1)
         )
-        # self.colors = np.tile(
-        #     np.array([1.0, 1.0, 1.0], dtype=np.float32), (self.num_particles, 1)
-        # )
 
         self.reset_color()
 
@@ -117,7 +111,7 @@ class Pbf():
             y = i // (self.num_particles_x*self.num_particles_z)
             z = (i % (self.num_particles_x*self.num_particles_z)) // self.num_particles_x
             delta = self.h_ * 0.8
-            offs = ti.Vector([(self.boundary[0] - delta * self.num_particles_x) * 0.95, 0, self.boundary[2] * 0.02]) # self.boundary[1] * 0.02
+            offs = ti.Vector([(self.boundary[0] - delta * self.num_particles_x) * 0.95, 0, self.boundary[2] * 0.02])
             self.positions[i] = ti.Vector([x, y, z]) * delta + offs
             for c in ti.static(range(self.dim)):
                 self.velocities[i][c] = (ti.random() - 0.5) * 4
@@ -231,13 +225,9 @@ class Pbf():
         # if True:
         for p_i in self.positions:
             cell = self.get_cell(self.positions[p_i])
-            # ti.Vector doesn't seem to support unpacking yet
-            # but we can directly use int Vectors as indices
             offs = ti.atomic_add(self.grid_num_particles[cell], 1)
-            assert(offs < self.max_num_particles_per_cell)
+            # assert offs < self.max_num_particles_per_cell, "If this assertion fails, please increase the self.max_num_particles_per_cell value. The assertion may fail when you increase self.time_delta value. Try not do this."
             self.grid2particles[cell, offs] = p_i
-            # if cell[0] == 25 and cell[1] == 0 and cell[2] == 1:
-                # print("offs larger than per cell, ", self.grid_num_particles[cell] - 1, ", cell: ", cell, " positions: ", self.positions[p_i])
 
     @ti.kernel
     def collect_set_of_potential_collided_particles(self):
@@ -257,12 +247,9 @@ class Pbf():
         for i in range(self.confirmed_rb_particle_collision_num[None]):
             idx = self.sdf_negative_indices[i]
             p_idx = self.rb_particle_collision_idx_set[idx]
-            # self.particle_colors[p_idx] = [0.0, 0.0, 0.0]   # TODO: change the specification format latter
             dis_values = self.sdf_negatives[i]
-            # if dis_values < self.rb_fp_collision_sdf_lower_bound:
-                # dis_values = self.rb_fp_collision_sdf_lower_bound
             collision_force = self.rb_fp_collision_stiffness * (- dis_values) * self.rb.faceN[self.primitive_indices[i]]
-            self.forces[p_idx] += collision_force # TODO: pos or collision point???????
+            self.forces[p_idx] += collision_force
     
     @ti.kernel
     def color_potential_particles(self):
@@ -272,8 +259,7 @@ class Pbf():
 
     def add_fluid_rb_collision_forces(self):
         self.collect_set_of_potential_collided_particles()
-        # Visualization, TODO: comment later
-        self.reset_color()
+        # self.reset_color()
         # self.color_potential_particles()
         if self.rb_particle_collision_num[None] == 0:
             return
@@ -289,14 +275,12 @@ class Pbf():
 
         sdf_negative_np = np.zeros(shape = (self.num_particles, ), dtype = np.float32)
         sdf_negative_np[:self.confirmed_rb_particle_collision_num[None]] = sdfs[np.where(sdfs < 0)]
-        # np.clip(sdf_negative_np, self.rb_fp_collision_sdf_lower_bound, 0, out=sdf_negative_np)
         self.sdf_negatives.from_numpy(sdf_negative_np)
 
         primitive_indices_np = np.zeros(shape = (self.num_particles, ), dtype = int)
         primitive_indices_np[:self.confirmed_rb_particle_collision_num[None]] = primitive_indices[np.where(sdfs < 0)]
         self.primitive_indices.from_numpy(primitive_indices_np)
-        
-        # print(np.min(sdf_negative_np[:self.confirmed_rb_particle_collision_num[None]]), np.max(sdf_negative_np[:self.confirmed_rb_particle_collision_num[None]]))
+
         self.apply_colision_forces_after_collision_detect()
 
     @ti.kernel
@@ -318,7 +302,7 @@ class Pbf():
             self.velocities[i] += self.forces[i] / self.mass * self.time_delta
             self.positions[i] += self.velocities[i] * self.time_delta
             self.positions[i] = self.confine_position_to_boundary(self.positions[i])
-        # TODO: if consider dynamiics 跳掉了add boundary collision impulses，需不需要confine rigid body positions to boundary
+
         # clear neighbor lookup table
         for I in ti.grouped(self.grid_num_particles):
             self.grid_num_particles[I] = 0
@@ -350,7 +334,6 @@ class Pbf():
     ## add visualization for 
     def prologue(self):
         self.prologue_part1()
-        # TODO: add update grid here?
         if self.rb != None:
             self.update_grid()
             self.add_fluid_rb_collision_forces()

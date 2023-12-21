@@ -14,8 +14,7 @@ class StaticRigidBody():
         self.n_vertices = len(self.mesh_o3d.vertices)
         self.n_faces = len(self.mesh_o3d.triangles)
         print("Load model {} with {} vertices and {} faces.".format(self.model_name, self.n_vertices, self.n_faces))
-        # self.origV = ti.Vector.field(3, ti.f32, self.n_vertices)
-        # self.origV.from_numpy(np.asarray(self.mesh_o3d.vertices, dtype = np.float32))
+
         self.scale = config_dict["model_scale"]
         self.pos = config_dict["model_pos"]
         self.rot = config_dict["model_rotation"]
@@ -40,7 +39,7 @@ class StaticRigidBody():
         self.vertexN.from_numpy(np.asarray(self.mesh_o3d.vertex_normals, dtype = np.float32))
         self.faceN_np = np.asarray(self.mesh_o3d.triangle_normals, dtype = np.float32)
         self.faceN.from_numpy(self.faceN_np)
-        # self.C = ti.Vector.field(3, ti.f32, self.n_vertices)   # TODO: per vertex colors
+
         self.color = config_dict["model_color"] # overall color
 
         self.V_np = self.V.to_numpy()
