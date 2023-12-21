@@ -28,7 +28,7 @@ To run the real-time simulation, you need to install <a href="https://www.taichi
 To run the rendering, you need to install <a href="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a href="https://www.blender.org/">Blender python API </a>
 ## Code Usage
 ### Real-time Simulation
-In this project, we built from scratch a Real-time Position-based Fluid Simulation pipeline, with advanced features like: static rigid body collision and white particle generation (foam, spray, and bubbles). It is fully developed with the Taichi language and provides a GGUI interface for visualization. We also provide scripts to export the particle-based simulation results into mesh, and render the final scene with Blender Python APIs.
+In this project, we built from scratch a Real-time Position-based Fluid Simulation pipeline, with advanced features like: static rigid body collision handling and diffuse particle generation (foam, spray, and bubbles). It is fully developed with the Taichi language and provides a GGUI interface for visualization. We also provide scripts to export the particle-based simulation results into mesh, and render the final scene with Blender Python APIs.
 
 The simulation process can run at 25+FPS on RTX 3070 GPU.
 
