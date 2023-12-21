@@ -16,10 +16,9 @@ ti.init(arch=ti.gpu)  # , debug=True
 screen_res = (1600, 800)
 bg_color = (1/255,47/255,65/255)
 particle_color = (6/255,133/255,135/255)
-foam_color = (1,1,1)
+foam_color = (1., 1., 1.)
 red_color = (1., 0., 0.)
 green_color = (0., 1., 0.)
-yellow_color = (255/255, 175/255, 0.)
 points_pos = ti.Vector.field(3, dtype=ti.f32, shape = 8) # boarder corners
 
 # init objects
@@ -46,36 +45,30 @@ def render(window, scene, canvas, camera):
     points_pos[7] = [b[0], -1, board_len]
     
     scene.lines(points_pos, color = (0.28, 0.68, 0.99), width = 10.0)
+
+    # draw fluid
     scene.particles(fluid.positions, color = particle_color, radius = 0.1, per_vertex_color = fluid.particle_colors)
-    # scene.particles(foam.all_foam_pos, color = foam_color, radius = 0.1)
+
+    # draw all diffuse particles
+    scene.particles(foam.all_foam_pos, color = foam_color, radius = 0.1)
+    
+    # draw classisified particles: foam, spray and bubbles
     scene.particles(foam.white_particles, color = foam_color, radius = 0.1)
     scene.particles(foam.red_particles, color = red_color, radius = 0.1)
     scene.particles(foam.green_particles, color = green_color, radius = 0.1)
-    # scene.particles(foam.yellow_particles, color = yellow_color, radius = 0.1)
+
+    # draw rigid body
     scene.mesh(rabbit_rb.V, rabbit_rb.F, rabbit_rb.vertexN, rabbit_rb.color) 
     scene.set_camera(camera)
 
     canvas.scene(scene)
     window.show()
 
-def print_stats():
-    print("PBF stats:")
-    num = fluid.grid_num_particles.to_numpy()
-    print(f" #Total particles: {fluid.positions.shape[0]}")
-    avg, max_ = np.mean(num), np.max(num)
-    print(f"  #particles per cell: avg={avg:.2f} max={max_}")
-    num = fluid.particle_num_neighbors.to_numpy()
-    avg, max_ = np.mean(num), np.max(num)
-    print(f"  #neighbors per particle: avg={avg:.2f} max={max_}")
-    print("Vorticity force of particle 0: {}".format(fluid.vorticity_forces[0]))
-
-def bake(frame, bake_foam = False,start=150, end=160):
+def bake(frame, start=150, end=160):
     if frame >= start and frame < end:
         print(f"Baking frame {frame-start+1}/{end-start}")
         filename = f"frame_{frame:05d}"
         pos_np = fluid.positions.to_numpy()
-        # pos_np = pos_np[:, (0, 2, 1)] # why???
-        # foam_np = foam.all_foam_pos.to_numpy()
         foam_np = foam.white_particles.to_numpy()
         bubble_np = foam.red_particles.to_numpy()
         spray_np = foam.green_particles.to_numpy()
@@ -89,7 +82,6 @@ def run():
     fluid.move_board()
     fluid.run_pbf()
     foam.run()
-    # print_stats()
 
 def main():
     fluid.init_particles()
@@ -108,24 +100,17 @@ def main():
     # camera.lookat(fluid.boundary[0]/2, 0, 0)
 
     # side view
-    camera.position(fluid.boundary[0]/2, fluid.boundary[1]/2, 40 * k)
-    camera.lookat(fluid.boundary[0]/2, fluid.boundary[1]/4, 0)
     # camera.position(-fluid.boundary[0]/2, fluid.boundary[1]/4, fluid.boundary[2]/2)
     # camera.lookat(0, fluid.boundary[1]/4, fluid.boundary[2]/2)
+
+    # front view
+    camera.position(fluid.boundary[0]/2, fluid.boundary[1]/2, 40 * k)
+    camera.lookat(fluid.boundary[0]/2, fluid.boundary[1]/4, 0)
+
     camera.up(0, 1, 0)
     camera.projection_mode(ti.ui.ProjectionMode.Perspective)
 
     print(f"boundary={fluid.boundary} grid={fluid.grid_size} cell_size={fluid.cell_size}")
-
-    export_rigid_info = False
-    # print(rock_rb.center)
-    # if export_rigid_info:
-    #     rigid_dict_json = {
-    #         "scalings": rock_rb.scale,
-    #         "pos": rock_rb.pos,
-    #         "center": rock_rb.center.tolist(),
-    #     }
-    #     convert_rigid_info_to_json(rigid_dict_json, 'rock')
 
     frame = 0
     start = True
