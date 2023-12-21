@@ -15,7 +15,6 @@ from utils import PROJ_PATH
 def main():
     dir_mesh = os.path.join(PROJ_PATH, 'meshes')
     dir_rendering = os.path.join(PROJ_PATH, 'rendering')
-    dir_particles = os.path.join(PROJ_PATH, 'particles')
     dir_foam_pcd = os.path.join(PROJ_PATH, 'foam_pcd')
     dir_spray_pcd = os.path.join(PROJ_PATH, 'spray_pcd')
     path_envmap= os.path.join(PROJ_PATH, 'textures', 'Skies-001.jpg')
@@ -29,14 +28,9 @@ def main():
     foam_pcd_name_list = sorted(glob.glob(os.path.join(dir_foam_pcd, "*.ply")))
     spray_pcd_name_list = sorted(glob.glob(os.path.join(dir_spray_pcd, "*.ply")))
     obj_list_num = len(obj_name_list)
-    # obj_path = dir_path+obj_name+".obj"
-    # obj_path_list = [dir_mesh+obj_name for obj_name in obj_name_list]
-    # foam_pcd_path_list = [dir_foam_pcd + foam_pcd_name for foam_pcd_name in foam_pcd_name_list]
-    # spray_pcd_path_list = [dir_spray_pcd + spray_pcd_name for spray_pcd_name in spray_pcd_name_list]
     obj_path_list = obj_name_list
     foam_pcd_path_list = foam_pcd_name_list
     spray_pcd_path_list = spray_pcd_name_list
-    # render_img_path = dir_path+obj_name+"_render_total.png"
     render_img_path = []
     obj_name_list_wo_ext = []
     foam_pcd_name_list_wo_ext = []
@@ -61,19 +55,11 @@ def main():
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
 
-    # scale_ratio = [0.12, 0.12, 0.12]
     scale_ratio = [1.0, 1.0, 1.0]
-
-    # # Set cursor to (0, 0, 0)
-    # bpy.context.scene.cursor.location = (0, 0, 0)
 
     # Create camera
     bpy.ops.object.add(type='CAMERA')
     camera = bpy.data.objects['Camera']
-    # camera.location = (16.68, -14.07, 10.20)
-    # camera.rotation_euler = (math.radians(62), math.radians(-2.91), math.radians(45.6))
-    # camera.location = (13.2098, -2.61762, 11.2616)
-    # camera.rotation_euler = (math.radians(43.962), math.radians(0), math.radians(83.495))
     camera.location = (132.151, -139.624, 10.7156)
     camera.rotation_euler = (math.radians(95.5347), math.radians(-0.000094), math.radians(33.8674))
     
@@ -108,6 +94,7 @@ def main():
     foam_mat_links.new(mat.node_tree.nodes['Principled BSDF'].outputs[0], mat.node_tree.nodes['Mix Shader'].inputs[2])
     # add ColorRamp, change it and add to mix shader fac
     mat.node_tree.nodes.new(type="ShaderNodeValToRGB")
+    # If you get error on this, you might need to change "Color Ramp" to "ColorRamp"
     mat.node_tree.nodes["Color Ramp"].color_ramp.elements[0].position = 0
     mat.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.139
     foam_mat_links.new(mat.node_tree.nodes['Color Ramp'].outputs[0], mat.node_tree.nodes['Mix Shader'].inputs[0])
@@ -138,6 +125,7 @@ def main():
     spray_mat_links.new(mat.node_tree.nodes['Principled BSDF'].outputs[0], mat.node_tree.nodes['Mix Shader'].inputs[2])
     # add ColorRamp, change it and add to mix shader fac
     mat.node_tree.nodes.new(type="ShaderNodeValToRGB")
+    # If you get error on this, you might need to change "Color Ramp" to "ColorRamp"
     mat.node_tree.nodes["Color Ramp"].color_ramp.elements[0].position = 0
     mat.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.139
     spray_mat_links.new(mat.node_tree.nodes['Color Ramp'].outputs[0], mat.node_tree.nodes['Mix Shader'].inputs[0])
@@ -197,7 +185,7 @@ def main():
     scene.render.resolution_percentage = 50
     scene.render.engine = 'CYCLES'
     scene.cycles.device = 'GPU'
-    bpy.context.scene.cycles.samples = 128
+    bpy.context.scene.cycles.samples = 64
 
     # set background image
     scene.world.use_nodes = True
@@ -214,34 +202,37 @@ def main():
     link = links.new(node_environment.outputs["Color"], node_background.inputs["Color"])
     link = links.new(node_background.outputs["Background"], node_output.inputs["Surface"])
 
-    # bpy.ops.object.light_add(type='SUN')
-    # light_ob = bpy.context.object
-    # light = light_ob.data
-    # light.energy = 1
-    # light_ob.location = (3.644, 15.456, 12.611)
-    # light_ob.rotation_euler = (math.radians(40.5), math.radians(46), math.radians(143))
-    # bpy.ops.object.light_add(type='AREA')
-    # light_ob = bpy.context.object
-    # light = light_ob.data
-    # light.energy = 100
-    # light.size = 6
-    # light_ob.location = (4.5389, -1.18225, 4.27092)
 
-
-    #scene.render.engine = 'BLENDER_EEVEE'
-
-    # bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "METAL"
-    # scene.cycles.device = 'GPU'
-    # scene.render.engine = 'CYCLES' # 'BLENDER_EEVEE'
-    # scene.render.film_transparent = True
-    # # (1920 1080) (1280 720) (960 540) (640 360)
-    # scene.render.resolution_x = 1920
-    # scene.render.resolution_y = 1080
-    # scene.render.image_settings.file_format = 'PNG'
+    # importing objects
+    # load bunny
+    bpy.ops.import_scene.obj(filepath=rabbit_config_dict['model_path'])
+    rigid = bpy.data.objects[rabbit_config_dict['model_name']]
+    scalings = rabbit_config_dict['model_scale']
+    bpy.ops.transform.resize(value=(scale_ratio[0]*scalings, scale_ratio[1]*scalings, scale_ratio[2]*scalings))
+    rigid.data.materials.clear()
+    rigid.data.materials.append(bpy.data.materials["RigidMaterial"])
     
-    # for i in range()
+    # load box
+    bpy.ops.import_scene.obj(filepath=path_box)
+    box = bpy.data.objects['Cube.001']
+    box.data.materials.clear()
+    box.data.materials.append(bpy.data.materials["boxMaterial"])
 
-    for i in range(1):
+    # load lights
+    bpy.ops.import_scene.obj(filepath=path_lights)
+    for j in range(1, 11):
+        light_name = 'top{}'.format(j)
+        light = bpy.data.objects[light_name]
+        light.data.materials.clear()
+        light.data.materials.append(bpy.data.materials["lightMaterial"])
+
+    # load curve
+    bpy.ops.import_scene.obj(filepath=path_curve)
+    curve = bpy.data.objects['curvePlane']
+    curve.data.materials.clear()
+    curve.data.materials.append(bpy.data.materials["curveMaterial"])
+
+    for i in range(obj_list_num):
         # load foam point cloud
         bpy.ops.import_mesh.ply(filepath = foam_pcd_path_list[i])
         foam_name = foam_pcd_name_list_wo_ext[i]
@@ -306,37 +297,6 @@ def main():
         water.data.materials.clear()
         water.data.materials.append(bpy.data.materials["WaterMaterial"])     
         scene.render.filepath = render_img_path[i]
-
-        rigid_all = []
-        if i==0:
-            # load rigid
-            bpy.ops.import_scene.obj(filepath=rabbit_config_dict['model_path'])
-            rigid = bpy.data.objects[rabbit_config_dict['model_name']]
-            rigid_all.append(rigid)
-            scalings = rabbit_config_dict['model_scale']
-            bpy.ops.transform.resize(value=(scale_ratio[0]*scalings, scale_ratio[1]*scalings, scale_ratio[2]*scalings))
-            rigid.data.materials.clear()
-            rigid.data.materials.append(bpy.data.materials["RigidMaterial"])
-            
-            # load box
-            bpy.ops.import_scene.obj(filepath=path_box)
-            box = bpy.data.objects['Cube.001']
-            box.data.materials.clear()
-            box.data.materials.append(bpy.data.materials["boxMaterial"])
-
-            # load lights
-            bpy.ops.import_scene.obj(filepath=path_lights)
-            for j in range(1, 11):
-                light_name = 'top{}'.format(j)
-                light = bpy.data.objects[light_name]
-                light.data.materials.clear()
-                light.data.materials.append(bpy.data.materials["lightMaterial"])
-
-            # load curve
-            bpy.ops.import_scene.obj(filepath=path_curve)
-            curve = bpy.data.objects['curvePlane']
-            curve.data.materials.clear()
-            curve.data.materials.append(bpy.data.materials["curveMaterial"])
 
         bpy.ops.object.select_all(action="DESELECT")
         # render and remove object

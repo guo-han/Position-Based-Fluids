@@ -23,7 +23,22 @@
 ## Presentation Video
 
 ## Environment Setup
+To run the real time simulation, you need to install <a herf="https://www.taichi-lang.org/">Taichi</a> and <a herf="http://www.open3d.org/">Open3d</a>. The python version we use is 3.10.13.
 
+To run the rendering, you need to install <a herf="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a herf="https://www.blender.org/">Blender python API </a>
 ## Code Usage
 ### Real-time Simulation
 ### Rendering
+
+## Reference
+[1] Macklin, Miles, and Matthias Müller. "Position based fluids." ACM Transactions on Graphics (TOG) 32.4 (2013): 1-12.
+
+[2] Ihmsen, Markus, et al. "Unified spray, foam and air bubbles for particle-based fluids." The Visual Computer 28 (2012): 669-677.
+
+[3] Taichi Blog for Collision Handling: https://docs.taichi-lang.org/blog/acclerate-collision-detection-with-taichi
+
+[4] Taichi PBF 2D Example by Ye Kuang: https://github.com/taichi-dev/taichi/blob/master/python/taichi/examples/simulation/pbf2d.py 
+
+[5] SPlisHSPlasH Library for Diffuse Particles Synthesis: https://github.com/InteractiveComputerGraphics/SPlisHSPlasH 
+
+
