@@ -23,7 +23,9 @@
 ## Presentation Video
 
 ## Environment Setup
+To run the real time simulation, you need to install <a herf="https://www.taichi-lang.org/">Taichi</a> and <a herf="http://www.open3d.org/">Open3d</a>. The python version we use is 3.10.13.
 
+To run the rendering, you need to install <a herf="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a herf="https://www.blender.org/">Blender python API </a>
 ## Code Usage
 ### Real-time Simulation
 The real-time simulation provides a Taichi GGUI interface for visualization. You'll witness a dynamic scene featuring a board in motion, creating ripples as it sways back and forth while various diffuse particles (green: spray; white: foam; red: bubble) are dynamically generated. Amidst this aquatic environment, a stationary bunny stands amidst the flowing water.
@@ -42,3 +44,14 @@ To prepare for rendering, follow these steps within the `main.py` file initially
 3. Execute `main.py` until the output confirms the completion of mesh baking.
 
 Afterward, execute `python blender_render.py` to commence image rendering. Please note that rendering the entire video sequence may require a considerable amount of time.
+
+## Reference
+[1] Macklin, Miles, and Matthias Müller. "Position based fluids." ACM Transactions on Graphics (TOG) 32.4 (2013): 1-12.
+
+[2] Ihmsen, Markus, et al. "Unified spray, foam and air bubbles for particle-based fluids." The Visual Computer 28 (2012): 669-677.
+
+[3] Taichi Blog for Collision Handling: https://docs.taichi-lang.org/blog/acclerate-collision-detection-with-taichi
+
+[4] Taichi PBF 2D Example by Ye Kuang: https://github.com/taichi-dev/taichi/blob/master/python/taichi/examples/simulation/pbf2d.py 
+
+[5] SPlisHSPlasH Library for Diffuse Particles Synthesis: https://github.com/InteractiveComputerGraphics/SPlisHSPlasH 
