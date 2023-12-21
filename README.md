@@ -17,18 +17,18 @@
     (Click to View our Demo Video)
 </p>
 <p align="center">
-    Here we present our group project developed for the <a href = "https://crl.ethz.ch/teaching/PBS23/index.html">Physically-based Simulation in Computer Graphics</a> course at ETH Zurich.  Our work involved the implementation of several key features, including position-based fluids (PBF), handling of simple static rigid body, and the generation of diffuse materials such as spray, foam, and bubbles.
+    Here we present our group project developed for the <a href = "https://crl.ethz.ch/teaching/PBS23/index.html">Physically-based Simulation in Computer Graphics</a> course at ETH Zurich.  Our work involved the implementation of several key features, including position-based fluids (PBF), handling of simple static rigid body, and generating diffuse materials such as spray, foam, and bubbles.
 </p>
 
 ## Presentation Video
 
 ## Environment Setup
-To run the real time simulation, you need to install <a href="https://www.taichi-lang.org/">Taichi</a> and <a href="http://www.open3d.org/">Open3d</a>. The python version we use is 3.10.13, the taichi version we use is taichi==1.6.0, the Open3d version we use is open3d==0.17.0.
+To run the real-time simulation, you need to install <a href="https://www.taichi-lang.org/">Taichi</a> and <a href="http://www.open3d.org/">Open3d</a>. The Python version we use is 3.10.13, the Taichi version is taichi==1.6.0, and the Open3d version is open3d==0.17.0.
 
 To run the rendering, you need to install <a href="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a href="https://www.blender.org/">Blender python API </a>
 ## Code Usage
 ### Real-time Simulation
-In this project, we built from scratch a Real-time Position-based Fluid Simulation pipeling, with advanced features like: static rigid body collision and white particles generation (foam, spray and bubbles). It is fully developed with TaiChi language and provides a GGUI interface for visualization. We also provide scripts to export the particle-based simulation results into mesh, and render the final scene with Blender Python APIs.
+In this project, we built from scratch a Real-time Position-based Fluid Simulation pipeline, with advanced features like: static rigid body collision and white particle generation (foam, spray, and bubbles). It is fully developed with the Taichi language and provides a GGUI interface for visualization. We also provide scripts to export the particle-based simulation results into mesh, and render the final scene with Blender Python APIs.
 
 The simulation process can run at 25+FPS on RTX 3070 GPU.
 
