@@ -28,7 +28,7 @@ To run the real time simulation, you need to install <a herf="https://www.taichi
 To run the rendering, you need to install <a herf="https://github.com/InteractiveComputerGraphics/splashsurf">splashsurf</a> and <a herf="https://www.blender.org/">Blender python API </a>
 ## Code Usage
 ### Real-time Simulation
-The real-time simulation provides a Taichi GGUI interface for visualization. You'll witness a dynamic scene featuring a board in motion, creating ripples as it sways back and forth while various diffuse particles (green: spray; white: foam; red: bubble) are dynamically generated. Amidst this aquatic environment, a stationary bunny stands amidst the flowing water.
+The real-time simulation provides a Taichi GGUI interface for visualization. You'll witness a dynamic scene featuring a board in motion, creating ripples as it sways back and forth while various diffuse particles (green: spray; white: foam; red: bubble) are dynamically generated. Amidst this aquatic environment, a stationary bunny stands in the flowing water.
 
 The simulation process can run at 25+FPS on RTX 3070 GPU.
 

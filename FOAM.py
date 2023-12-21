@@ -1,7 +1,6 @@
 import os
 import math
 import numpy as np
-from sklearn.decomposition import PCA
 import taichi as ti
 from PBF import Pbf
 from utils import PROJ_PATH, MESH_dir, read_obj
