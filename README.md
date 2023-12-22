@@ -8,11 +8,11 @@
     <a href="https://github.com/Ribosome-rbx"><strong>Boxiang Rong*</strong></a>
   </p>
   <p align="center"><strong>(* Equal Contribution)</strong></p>
-  <h3 align="center"> <a href="">Slides</a> | <a href="https://youtu.be/4cRjTvnfNx8">Presentation</a> | <a href="https://youtu.be/6cz7K6m6m8M">Demo</a> </h3>
+  <h3 align="center"> Slides (<a href="./misc/slides/PBS_Final_Slides.pdf">pdf</a>, <a href="https://docs.google.com/presentation/d/1FDaCpLuZ-d3ePbB2i_EjrVKCm3rL1_fY/edit?usp=sharing&ouid=104714924119963307582&rtpof=true&sd=true">pptx</a>) | <a href="https://youtu.be/4cRjTvnfNx8">Presentation</a> | <a href="https://youtu.be/6cz7K6m6m8M">Demo</a> </h3>
   <div align="center"></div>
 </p>
 
-[![](./imgs/all_high_res.png)](https://youtu.be/6cz7K6m6m8M)
+[![](./misc/imgs/all_high_res.png)](https://youtu.be/6cz7K6m6m8M)
 <p align="center">
     (Click to View our Demo Video)
 </p>
@@ -21,7 +21,7 @@
 </p>
 
 ## Presentation Video
-[![](./imgs/foam_high_res.png)](https://youtu.be/4cRjTvnfNx8)
+[![](./misc/imgs/foam_high_res.png)](https://youtu.be/4cRjTvnfNx8)
 <p align="center">
     (Click to View our Presentation Video)
 </p>

@@ -11,7 +11,7 @@ rabbit_render_config_dict = {
 
 rabbit_config_dict = {
     "model_name": "bunny_final",
-    "model_path": './data/models/bunny_final.obj',
+    "model_path": './Assets/bunny_final.obj',
     'model_color': (0.9, 0.9, 0.9),
     'model_scale': 1,
     'model_pos': [0, 0, 0],
