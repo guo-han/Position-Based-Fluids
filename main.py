@@ -122,7 +122,7 @@ def main():
         if start:
             run()
             if bake_mesh:
-                bake(frame, True, 240, 250)
+                bake(frame, 240, 250)
             frame += 1
         # rendering
         render(window, scene, canvas, camera)
