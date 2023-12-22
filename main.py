@@ -50,7 +50,7 @@ def render(window, scene, canvas, camera):
     scene.particles(fluid.positions, color = particle_color, radius = 0.1, per_vertex_color = fluid.particle_colors)
 
     # draw all diffuse particles
-    scene.particles(foam.all_foam_pos, color = foam_color, radius = 0.1)
+    # scene.particles(foam.all_foam_pos, color = foam_color, radius = 0.1)
     
     # draw classisified particles: foam, spray and bubbles
     scene.particles(foam.white_particles, color = foam_color, radius = 0.1)
