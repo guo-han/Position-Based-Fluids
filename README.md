@@ -43,8 +43,8 @@ python main.py
 ### Rendering
 To prepare for rendering, follow these steps within the `main.py` file initially:
 
-1. Set `bake_mesh = True` on line 132.
-2. Specify the starting and ending frames for mesh creation on line 140.
+1. Set `bake_mesh = True` on line 117.
+2. Specify the starting and ending frames for mesh creation on line 125.
 3. Execute `main.py` until the output confirms the completion of mesh baking.
 
 Afterward, execute `python blender_render.py` to commence image rendering. Please note that rendering the entire video sequence may require a considerable amount of time.
